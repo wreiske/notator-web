@@ -130,6 +130,7 @@ export function TrackList({
         </thead>
         <tbody className="divide-y divide-notator-border/30">
           {tracks.map((track, index) => {
+            const isEmpty = track.events.length === 0 && !track.name;
             const noteOnCount = track.events.filter(
               (e) => e.type === "note_on",
             ).length;
@@ -144,7 +145,10 @@ export function TrackList({
             const isActive = activeTrackIndices.has(index);
             const isSelected = index === selectedTrackIndex;
             const isRenaming = renamingIndex === index;
-            const displayName = track.name || `Track ${index + 1}`;
+            const displayName =
+              track.name ||
+              (isEmpty ? "---" : `Track ${(track.trackIndex ?? index) + 1}`);
+            const trackNum = (track.trackIndex ?? index) + 1;
 
             return (
               <tr
@@ -159,19 +163,21 @@ export function TrackList({
                 className={`
                   group cursor-pointer text-[11px] transition-colors
                   ${
-                    isSelected
-                      ? "bg-notator-highlight text-white"
-                      : isActive
-                        ? "bg-notator-selection text-white"
-                        : isMuted
-                          ? "bg-notator-bg/50 text-notator-text-dim"
-                          : "text-notator-text hover:bg-notator-surface-hover"
+                    isEmpty
+                      ? "text-notator-text-dim/40"
+                      : isSelected
+                        ? "bg-notator-highlight text-white"
+                        : isActive
+                          ? "bg-notator-selection text-white"
+                          : isMuted
+                            ? "bg-notator-bg/50 text-notator-text-dim"
+                            : "text-notator-text hover:bg-notator-surface-hover"
                   }
                 `}
                 id={`track-row-${index}`}
               >
                 <td className="border-r border-notator-border/50 px-1.5 py-1.5 text-center font-bold text-notator-text-muted">
-                  {index + 1}
+                  {trackNum}
                 </td>
                 <td className="max-w-[160px] border-r border-notator-border/50 px-2 py-1.5 font-bold">
                   {isRenaming ? (
@@ -200,6 +206,8 @@ export function TrackList({
                       className="w-full rounded border border-notator-accent bg-notator-bg px-1 py-0 font-mono text-[11px] font-bold text-notator-text outline-none focus:ring-1 focus:ring-notator-accent"
                       id={`track-rename-input-${index}`}
                     />
+                  ) : isEmpty ? (
+                    <span className="text-notator-text-dim/30">---</span>
                   ) : (
                     <span
                       className="block cursor-text truncate hover:text-notator-accent"
@@ -217,21 +225,27 @@ export function TrackList({
                   )}
                 </td>
                 <td className="border-r border-notator-border/50 px-2 py-1.5 text-notator-text-muted">
-                  {isDrums ? (
+                  {isEmpty ? (
+                    ""
+                  ) : isDrums ? (
                     <span className="text-notator-amber">DRUMS</span>
                   ) : notes.length > 0 ? (
                     <span>NOTE</span>
                   ) : (
-                    <span className="text-notator-text-dim">---</span>
+                    <span className="text-notator-text-dim">----</span>
                   )}
                 </td>
                 <td className="border-r border-notator-border/50 px-1.5 py-1.5 text-center">
-                  <span className="text-notator-accent">
-                    {channelToGroup(track.channel)}
-                  </span>
-                  <span className="ml-0.5 text-notator-text-muted">
-                    {(track.channel % 16) + 1}
-                  </span>
+                  {!isEmpty && (
+                    <>
+                      <span className="text-notator-accent">
+                        {channelToGroup(track.channel)}
+                      </span>
+                      <span className="ml-0.5 text-notator-text-muted">
+                        {(track.channel % 16) + 1}
+                      </span>
+                    </>
+                  )}
                 </td>
                 <td className="border-r border-notator-border/50 px-1.5 py-1.5 text-right tabular-nums text-notator-text-muted">
                   {noteOnCount > 0 ? noteOnCount : ""}
@@ -246,38 +260,42 @@ export function TrackList({
                   )}
                 </td>
                 <td className="border-r border-notator-border/50 px-0.5 py-1.5 text-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleMute(index);
-                    }}
-                    className={`notator-btn rounded px-1 text-[10px] ${
-                      isMuted
-                        ? "border-notator-red bg-notator-red/20 text-notator-red"
-                        : "border-transparent text-notator-text-dim hover:text-notator-text"
-                    }`}
-                    title={isMuted ? "Unmute" : "Mute"}
-                    id={`track-mute-${index}`}
-                  >
-                    M
-                  </button>
+                  {!isEmpty && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleMute(index);
+                      }}
+                      className={`notator-btn rounded px-1 text-[10px] ${
+                        isMuted
+                          ? "border-notator-red bg-notator-red/20 text-notator-red"
+                          : "border-transparent text-notator-text-dim hover:text-notator-text"
+                      }`}
+                      title={isMuted ? "Unmute" : "Mute"}
+                      id={`track-mute-${index}`}
+                    >
+                      M
+                    </button>
+                  )}
                 </td>
                 <td className="px-0.5 py-1.5 text-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleSolo(index);
-                    }}
-                    className={`notator-btn rounded px-1 text-[10px] ${
-                      isSoloed
-                        ? "border-notator-amber bg-notator-amber/20 text-notator-amber"
-                        : "border-transparent text-notator-text-dim hover:text-notator-text"
-                    }`}
-                    title={isSoloed ? "Unsolo" : "Solo"}
-                    id={`track-solo-${index}`}
-                  >
-                    S
-                  </button>
+                  {!isEmpty && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleSolo(index);
+                      }}
+                      className={`notator-btn rounded px-1 text-[10px] ${
+                        isSoloed
+                          ? "border-notator-amber bg-notator-amber/20 text-notator-amber"
+                          : "border-transparent text-notator-text-dim hover:text-notator-text"
+                      }`}
+                      title={isSoloed ? "Unsolo" : "Solo"}
+                      id={`track-solo-${index}`}
+                    >
+                      S
+                    </button>
+                  )}
                 </td>
               </tr>
             );

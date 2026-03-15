@@ -40,6 +40,13 @@ export interface SonFile {
    */
   preBoundaryPadding: Uint8Array;
 
+  /**
+   * Pattern names read from the header name table at 0x21be.
+   * 16 entries of 8 chars each, indexed by 0-based pattern number.
+   * Entry 0 is always the default (e.g., "Pattern:" or "Name").
+   */
+  patternNames: string[];
+
   /** Convenience: derived SongData for playback/UI */
   songData: SongData;
 }
@@ -186,8 +193,15 @@ export interface ArrangementEntry {
   bar: number;
   /** Length of this entry in bars */
   length: number;
-  /** Display name (pattern name or "Pattern N") */
+  /** Display name (arrangement name or pattern name) */
   name: string;
+  /** Pattern columns a/b/c/d — 1-based pattern indices (0 = unused) */
+  columns: {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+  };
 }
 
 export interface Pattern {
@@ -208,6 +222,8 @@ export interface ChannelConfig {
 export interface Track {
   name: string;
   channel: number;
+  /** Original 0-indexed position within the pattern (0–15) */
+  trackIndex: number;
   header: Uint8Array;
   config?: Uint8Array;
   /** Parsed track config (filters, port, note range) */

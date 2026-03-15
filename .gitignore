@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.dev.vars
 
 # vercel
 .vercel
@@ -48,7 +49,12 @@ next-env.d.ts
 /son-parser-wasm/pkg/
 
 # Reverse-engineering tools (Ghidra, RetroGhidra — large repos)
-/tools/
+/tools/*
+# But allow the notator-floppy companion tool
+!/tools/notator-floppy/
+# Ignore floppy disk archives (raw .st images and extracted files)
+/tools/notator-floppy/floppy_archive/
+/tools/notator-floppy/__pycache__/
 
 # Gemini agent data
 .gemini/

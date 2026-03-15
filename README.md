@@ -56,10 +56,55 @@ notator-web/
 ├── public/
 │   ├── demos/                     # Bundled .SON demo files
 │   └── webaudiofont/              # Vendored WebAudioFont player
+├── tools/
+│   └── notator-floppy/               # Floppy disk reader tool
+│       ├── notator_floppy.py          # CLI for disk detection/extraction
+│       ├── notator_floppy_gui.py      # GUI for bulk transfers
+│       ├── disk_reader.py             # Raw disk reading (macOS/Linux/Win)
+│       └── atari_fat.py               # Atari ST FAT12 filesystem parser
 ├── types/
 │   └── webaudiofont.d.ts          # TypeScript declarations
 └── next.config.ts                 # Static export config
 ```
+
+## 💾 Floppy Disk Companion Tool
+
+A Python-based CLI and GUI for reading Atari ST floppy disks, extracting `.SON` files, and creating disk images. Perfect for bulk-transferring an entire collection of Notator floppies.
+
+### Requirements
+
+- Python 3.8+
+- USB floppy drive
+- `sudo` access on macOS/Linux for raw disk reading
+
+### Quick Start
+
+```bash
+cd tools/notator-floppy
+
+# CLI: Detect connected floppy drives
+python3 notator_floppy.py detect
+
+# CLI: Extract all files from a floppy
+sudo python3 notator_floppy.py extract --output-dir ./my_songs
+
+# CLI: Create a raw disk image backup (.ST format)
+sudo python3 notator_floppy.py image my_backup.st
+
+# GUI: Launch the bulk transfer interface
+python3 notator_floppy_gui.py
+```
+
+### Bulk Transfer Workflow
+
+The GUI automates the process of archiving a large floppy collection:
+
+1. **Insert** an Atari ST floppy disk
+2. The tool **reads** the disk, **extracts** all files, and **saves** a raw `.ST` disk image
+3. A completion sound plays and the disk is **auto-ejected**
+4. **Insert** the next disk — the tool auto-detects it and repeats
+
+All extracted files and disk images are saved to `tools/notator-floppy/floppy_archive/` (gitignored).
 
 ## 🚀 Getting Started
 

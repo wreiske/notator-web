@@ -53,6 +53,13 @@ const PROGRAM_MAP_OFFSET = 0x0340;
 const VOLUME_MAP_OFFSET = 0x0350;
 const PAN_MAP_OFFSET = 0x0360;
 
+/** Track pointer table — maps pattern×track to file offsets */
+const TRACK_POINTER_TABLE_OFFSET = 0x0502;
+/** 4 bytes per entry: uint16 BE pointer + uint16 BE metadata */
+const TRACK_POINTER_ENTRY_SIZE = 4;
+/** Pointer value indicating an empty/unused track slot */
+const EMPTY_TRACK_POINTER = 0x1d40;
+
 /** Extended header region */
 const EXTENDED_HEADER_OFFSET = 0x0008;
 const EXTENDED_HEADER_SIZE = 26; // 0x0008–0x0021
@@ -61,8 +68,13 @@ const EXTENDED_HEADER_SIZE = 26; // 0x0008–0x0021
 const TRACK_GROUP_OFFSET = 0x0330;
 const TRACK_GROUP_SIZE = 64; // 0x0330–0x036F (only first 16 bytes used for mapping)
 
-/** Arrangement region */
-const ARRANGE_OFFSET = 0x0370;
+/** Pattern name table: 16 names × 8 bytes at this offset */
+const PATTERN_NAME_TABLE_OFFSET = 0x21be;
+const MAX_PATTERN_NAMES = 16;
+const PATTERN_NAME_SIZE = 8;
+
+/** Default pattern names that should be treated as unnamed */
+const DEFAULT_PATTERN_NAMES = ["Pattern:", "Name"];
 
 /** Boundary markers */
 const BOUNDARY_A = [0x7f, 0xff, 0xff, 0xff] as const;
@@ -100,17 +112,80 @@ export function parseSonFile(buffer: ArrayBuffer): SonFile {
   // ─── Parse header fields ────────────────────────────────────────
   const header = parseHeader(data, view);
 
-  // ─── Split track region on boundaries ───────────────────────────
+  // ─── Split file on track boundaries ─────────────────────────────
+  // Scan from after the pointer table — in large SON files (>64KB),
+  // track data boundaries can exist inside the header region.
+  const BOUNDARY_SCAN_START =
+    TRACK_POINTER_TABLE_OFFSET +
+    24 * TRACKS_PER_PATTERN * TRACK_POINTER_ENTRY_SIZE; // 0x0B02
   const { chunks, boundaries, preBoundaryPadding } = splitOnBoundariesWithInfo(
     data,
-    TRACK_DATA_OFFSET,
+    BOUNDARY_SCAN_START,
   );
 
   // ─── Parse ALL track slots ─────────────────────────────────────
   const trackSlots: TrackSlot[] = chunks.map((chunk) => parseTrackSlot(chunk));
 
+  // ─── Build file-offset → TrackSlot map ─────────────────────────
+  // Each boundary's data starts at boundaryPos + 4. The pointer table
+  // references dataStart + 2, so we index by that adjusted offset.
+  const slotByOffset = new Map<number, TrackSlot>();
+  for (let i = 0; i < boundaries.length && i < trackSlots.length; i++) {
+    const dataStart = boundaries[i].fileOffset + 4;
+    // Pointer table values = dataStart + 2
+    slotByOffset.set(dataStart + 2, trackSlots[i]);
+  }
+
+  // ─── Parse pattern name table ──────────────────────────────────
+  // The name table at 0x21be stores 16 × 8-byte pattern names.
+  // Entry[0] should be a default like "Pattern:" — if not, the offset
+  // contains track event data for this file, so skip the table.
+  const patternNames: string[] = [];
+  const nameTableValid = (() => {
+    const off = PATTERN_NAME_TABLE_OFFSET;
+    if (off + PATTERN_NAME_SIZE > data.length) return false;
+    // Check that all 8 bytes of entry[0] are printable ASCII or null
+    for (let j = 0; j < PATTERN_NAME_SIZE; j++) {
+      const b = data[off + j];
+      if (b === 0) break;
+      if (b < 0x20 || b >= 0x7f) return false;
+    }
+    // Read entry[0] and verify it matches a known default
+    let firstEntry = "";
+    for (let j = 0; j < PATTERN_NAME_SIZE; j++) {
+      const b = data[off + j];
+      if (b === 0) break;
+      firstEntry += String.fromCharCode(b);
+    }
+    firstEntry = firstEntry.trim();
+    return DEFAULT_PATTERN_NAMES.some(
+      (d) => firstEntry === d || firstEntry.startsWith(d.replace(/:$/, "")),
+    );
+  })();
+
+  if (nameTableValid) {
+    for (let i = 0; i < MAX_PATTERN_NAMES; i++) {
+      const nameOffset = PATTERN_NAME_TABLE_OFFSET + i * PATTERN_NAME_SIZE;
+      if (nameOffset + PATTERN_NAME_SIZE > data.length) break;
+      let name = "";
+      for (let j = 0; j < PATTERN_NAME_SIZE; j++) {
+        const b = data[nameOffset + j];
+        if (b === 0) break;
+        if (b >= 0x20 && b < 0x7f) name += String.fromCharCode(b);
+      }
+      patternNames.push(name.trim());
+    }
+  }
+
   // ─── Build playback-oriented SongData ───────────────────────────
-  const songData = buildSongData(header, trackSlots, data, view);
+  const songData = buildSongData(
+    header,
+    trackSlots,
+    data,
+    view,
+    slotByOffset,
+    patternNames,
+  );
 
   const sonFile: SonFile = {
     rawHeader,
@@ -118,6 +193,7 @@ export function parseSonFile(buffer: ArrayBuffer): SonFile {
     trackSlots,
     boundaries,
     preBoundaryPadding,
+    patternNames,
     songData,
   };
 
@@ -599,12 +675,87 @@ function buildSongData(
   trackSlots: TrackSlot[],
   data: Uint8Array,
   view: DataView,
+  slotByOffset: Map<number, TrackSlot>,
+  patternNames: string[],
 ): SongData {
-  // Build Track[] from playable TrackSlots
-  const allTracks: (Track | null)[] = trackSlots.map((slot, index) => {
+  // ─── Read the track pointer table from the header ──────────────
+  // The table at 0x0502 maps each pattern×track to a file offset.
+  // Each entry is 4 bytes: uint16 BE ptr_low + uint16 BE next_ptr_high.
+  // The full pointer for entry[t] = (entry[t-1].nextHigh << 16) | entry[t].ptrLow.
+  // This allows 32-bit addressing for files >64KB.
+  // Pointer low word 0x1d40 with high word 0 = empty track slot.
+  const maxTablePatterns = Math.floor(
+    (TRACK_DATA_OFFSET - TRACK_POINTER_TABLE_OFFSET) /
+      (TRACKS_PER_PATTERN * TRACK_POINTER_ENTRY_SIZE),
+  );
+
+  /** Read the full 32-bit track pointer for pattern p, track t.
+   * Each 4-byte entry: uint16 BE ptr_low (bytes 0-1), uint16 BE next_high (bytes 2-3).
+   * The high word for entry[N] comes from entry[N-1]'s bytes 2-3.
+   * The initial high word (for p=0,t=0) is at offset 0x0500, just before the table.
+   */
+  function readTrackPointer(p: number, t: number): number {
+    const entryOffset =
+      TRACK_POINTER_TABLE_OFFSET +
+      p * TRACKS_PER_PATTERN * TRACK_POINTER_ENTRY_SIZE +
+      t * TRACK_POINTER_ENTRY_SIZE;
+    if (entryOffset + 4 > data.length) return 0;
+
+    const ptrLow = view.getUint16(entryOffset, false);
+
+    // High word comes from the previous entry's bytes 2-3
+    let ptrHigh = 0;
+    if (t > 0) {
+      const prevOffset = entryOffset - TRACK_POINTER_ENTRY_SIZE;
+      ptrHigh = view.getUint16(prevOffset + 2, false);
+    } else if (p > 0) {
+      // For t=0, take from last entry of previous pattern row
+      const prevRowLastOffset =
+        TRACK_POINTER_TABLE_OFFSET +
+        (p - 1) * TRACKS_PER_PATTERN * TRACK_POINTER_ENTRY_SIZE +
+        (TRACKS_PER_PATTERN - 1) * TRACK_POINTER_ENTRY_SIZE;
+      if (prevRowLastOffset + 4 <= data.length) {
+        ptrHigh = view.getUint16(prevRowLastOffset + 2, false);
+      }
+    } else {
+      // For the very first entry (p=0, t=0): initial high word at 0x0500
+      const initHighOffset = TRACK_POINTER_TABLE_OFFSET - 2;
+      if (initHighOffset >= 0 && initHighOffset + 2 <= data.length) {
+        ptrHigh = view.getUint16(initHighOffset, false);
+      }
+    }
+
+    return (ptrHigh << 16) | ptrLow;
+  }
+
+  /** Check if a pointer value represents an empty track */
+  function isEmptyPointer(ptr: number): boolean {
+    return ptr === EMPTY_TRACK_POINTER || ptr === 0;
+  }
+
+  // Find last pattern with any non-empty entry
+  let numPatterns = 0;
+  for (let p = 0; p < maxTablePatterns; p++) {
+    let hasEntry = false;
+    for (let t = 0; t < TRACKS_PER_PATTERN; t++) {
+      const ptr = readTrackPointer(p, t);
+      if (!isEmptyPointer(ptr)) {
+        hasEntry = true;
+        break;
+      }
+    }
+    if (hasEntry) numPatterns = p + 1;
+  }
+
+  // If no pointer table entries found, fall back to sequential grouping
+  if (numPatterns === 0) {
+    numPatterns = Math.ceil(trackSlots.length / TRACKS_PER_PATTERN);
+  }
+
+  // ─── Helper: convert a TrackSlot into a playable Track ─────────
+  function slotToTrack(slot: TrackSlot, trackIndex: number): Track | null {
     if (!slot.hasPlayableEvents) return null;
 
-    // Filter to only MIDI events for playback
     const midiEvents = slot.events.filter(
       (e): e is TrackEvent =>
         e.type === "note_on" ||
@@ -619,59 +770,116 @@ function buildSongData(
 
     if (midiEvents.length === 0) return null;
 
-    // Resolve channel: use track config, then header config, then slot index
-    const slotInPattern = index % TRACKS_PER_PATTERN;
-    let channel = slotInPattern;
-
-    // Track config channel (from the 14-byte config block)
-    if (slot.config.midiChannel > 0) {
-      channel = slot.config.midiChannel - 1; // 1-based in config
+    // Resolve channel: byte 5 of the track header is the 1-based MIDI channel
+    // (the preamble has 2 extra leading bytes from boundary markers)
+    // e.g., 9 = channel 10 (A9 in Notator display), 1 = channel 1 (A1)
+    let channel = trackIndex;
+    const headerChByte = slot.rawHeader.length > 5 ? slot.rawHeader[5] : 0;
+    if (headerChByte > 0 && headerChByte <= 16) {
+      channel = headerChByte - 1; // Convert 1-based to 0-based
+    } else if (slot.config.midiChannel > 0) {
+      channel = slot.config.midiChannel - 1;
     } else {
-      // Fallback to header channel map
-      const headerChannel = header.channelConfig.channels[slotInPattern];
+      const headerChannel = header.channelConfig.channels[trackIndex];
       if (headerChannel !== undefined && headerChannel <= 15) {
         channel = headerChannel;
       }
     }
 
     const isDrums =
-      channel === 9 || /drum|percuss/i.test(slot.name) || slotInPattern === 9;
+      channel === 9 || /drum|percuss/i.test(slot.name) || trackIndex === 9;
 
     return {
       name: slot.name,
       channel: isDrums ? 9 : channel,
+      trackIndex,
       header: slot.rawHeader,
       config: slot.rawConfig,
       trackConfig: slot.config,
       events: midiEvents,
     };
-  });
+  }
 
-  // Group into patterns (ALL patterns, including empty ones)
+  // ─── Build patterns using the pointer table ────────────────────
   const patterns: Pattern[] = [];
-  const numPatterns = Math.ceil(allTracks.length / TRACKS_PER_PATTERN);
+  const hasPointerTable = slotByOffset.size > 0;
 
   for (let p = 0; p < numPatterns; p++) {
-    const startSlot = p * TRACKS_PER_PATTERN;
     const patternTracks: Track[] = [];
+    const patternSlots: (TrackSlot | null)[] = [];
 
     for (let t = 0; t < TRACKS_PER_PATTERN; t++) {
-      const track = allTracks[startSlot + t];
-      if (track) patternTracks.push(track);
+      let slot: TrackSlot | null = null;
+
+      if (hasPointerTable) {
+        const ptr = readTrackPointer(p, t);
+        if (!isEmptyPointer(ptr)) {
+          slot = slotByOffset.get(ptr) ?? null;
+        }
+      } else {
+        // Fallback: sequential grouping (legacy behaviour)
+        const slotIdx = p * TRACKS_PER_PATTERN + t;
+        slot = slotIdx < trackSlots.length ? trackSlots[slotIdx] : null;
+      }
+
+      patternSlots.push(slot);
+
+      if (slot) {
+        const track = slotToTrack(slot, t);
+        if (track) {
+          patternTracks.push(track);
+        } else {
+          // Slot exists but has no playable MIDI events — empty track
+          patternTracks.push({
+            name: slot.name || "",
+            channel: t,
+            trackIndex: t,
+            header: slot.rawHeader,
+            config: slot.rawConfig,
+            trackConfig: slot.config,
+            events: [],
+          });
+        }
+      } else {
+        // No slot at all — empty placeholder
+        patternTracks.push({
+          name: "",
+          channel: t,
+          trackIndex: t,
+          header: new Uint8Array(0),
+          events: [],
+        });
+      }
     }
 
-    // Derive a name from the first named track in this pattern
-    let patternName = `Pattern ${p + 1}`;
-    for (let t = 0; t < TRACKS_PER_PATTERN; t++) {
-      const slot = trackSlots[startSlot + t];
-      if (
-        slot &&
-        slot.name &&
-        slot.name.trim() &&
-        slot.name.trim() !== "Name"
-      ) {
-        patternName = slot.name.trim();
-        break;
+    // Use pattern name from name table if available and non-default
+    const tableNameIdx = p + 1; // 1-based: entry[0] is default, entry[1]=pat1
+    const tableName =
+      tableNameIdx < patternNames.length
+        ? patternNames[tableNameIdx]
+        : undefined;
+    const isDefaultName =
+      !tableName ||
+      DEFAULT_PATTERN_NAMES.some((d) =>
+        tableName.startsWith(d.replace(/:$/, "")),
+      );
+
+    let patternName: string;
+    if (!isDefaultName && tableName) {
+      patternName = tableName;
+    } else {
+      // Fall back to first named track
+      patternName = `Pattern ${p + 1}`;
+      for (const slot of patternSlots) {
+        if (
+          slot &&
+          slot.name &&
+          slot.name.trim() &&
+          slot.name.trim() !== "Name"
+        ) {
+          patternName = slot.name.trim();
+          break;
+        }
       }
     }
 
@@ -680,12 +888,16 @@ function buildSongData(
       return last ? Math.max(max, last.tick) : max;
     }, 0);
 
-    patterns.push({
-      index: p,
-      name: patternName,
-      tracks: patternTracks,
-      totalTicks,
-    });
+    // Only add patterns that have at least one track with events
+    const hasAnyEvents = patternTracks.some((t) => t.events.length > 0);
+    if (hasAnyEvents) {
+      patterns.push({
+        index: p,
+        name: patternName,
+        tracks: patternTracks,
+        totalTicks,
+      });
+    }
   }
 
   // Parse arrangement (pass patterns so we can reference their names)
@@ -731,23 +943,25 @@ function buildSongData(
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// ARRANGEMENT PARSING
-// ═══════════════════════════════════════════════════════════════════════
-
 /**
- * Parse the arrangement region at 0x0370.
+ * Parse the arrangement table.
  *
- * Layout (400 bytes total):
- *   0x0370–0x0371: Total bar count (big-endian uint16)
- *   0x0386–0x0387: Config/count byte
- *   0x0388–0x03AF: F0 entries — start of each arrangement section (4 bytes: 00 00 XX F0)
- *   0x03B0–0x03D7: EF entries — end of each arrangement section   (4 bytes: 00 00 XX EF)
+ * The arrangement is stored as 24-byte entries starting at offset 0x20BE.
+ * Each entry:
+ *   byte  0     : pattern index (1-based, 0 = stop marker)
+ *   bytes 1-11  : configuration (tick position, flags)
+ *   bytes 12-19 : name (8 chars, high-bit stripped on alternating bytes)
+ *   bytes 20-23 : post-name config (bytes 22-23 = 0x80 0xD2 signature)
  *
- * The value byte XX encodes a pattern reference. Consecutive entries differ by 12,
- * with (XX ÷ 12 - 2) giving the 0-based pattern index for most entries.
- * Bar lengths are derived from the difference between corresponding EF and F0 values.
+ * The table ends when a sentinel entry is reached (pat=0 with name "stop",
+ * or pat=127 with byte1=0xFF, or the 0x80 0xD2 signature is absent and
+ * the name is empty).
  */
+const ARRANGE_TABLE_OFFSET = 0x20be;
+const ARRANGE_ENTRY_SIZE = 24;
+const ARRANGE_SIG_0 = 0x80;
+const ARRANGE_SIG_1 = 0xd2;
+
 function parseArrangement(
   data: Uint8Array,
   view: DataView,
@@ -756,23 +970,112 @@ function parseArrangement(
 ): ArrangementEntry[] {
   const entries: ArrangementEntry[] = [];
 
-  // ── Read F0 entries (arrangement start markers) ─────────────
-  const F0_START = ARRANGE_OFFSET + 0x18; // 0x0388
-  const F0_END = ARRANGE_OFFSET + 0x40; // 0x03B0
-  const f0Values: number[] = [];
+  // ── Detect whether the 24-byte arrangement table exists ──────
+  const hasTable = (() => {
+    const off = ARRANGE_TABLE_OFFSET;
+    if (off + ARRANGE_ENTRY_SIZE * 3 > data.length) return false;
+    // Check that at least 3 consecutive entries have the 0x80 0xD2 signature
+    for (let e = 0; e < 3; e++) {
+      const eOff = off + e * ARRANGE_ENTRY_SIZE;
+      if (
+        data[eOff + 22] !== ARRANGE_SIG_0 ||
+        data[eOff + 23] !== ARRANGE_SIG_1
+      )
+        return false;
+    }
+    return true;
+  })();
 
-  for (let off = F0_START; off < F0_END; off += 4) {
-    if (off + 4 > data.length) break;
-    const val = view.getUint32(off, false);
-    if (val === 0) break;
-    const marker = val & 0xff;
-    if (marker !== 0xf0) break;
-    const refByte = (val >> 8) & 0xff;
-    f0Values.push(refByte);
+  if (hasTable) {
+    // ── Read 24-byte arrangement entries ──────────────────────
+    // Tick position = (pageBit * 0x10000) + uint16BE(bytes 2-3)
+    // where pageBit = byte1 & 0x01 (handles 16-bit overflow for long songs)
+    //
+    // Auto-detect ticks-per-bar from tick deltas (GCD of all non-zero
+    // consecutive deltas). The parser's ticksPerMeasure may use a
+    // different time signature unit than the arrangement bars.
+    const tickPositions: number[] = [];
+    for (let e = 0; e < 64; e++) {
+      const off = ARRANGE_TABLE_OFFSET + e * ARRANGE_ENTRY_SIZE;
+      if (off + ARRANGE_ENTRY_SIZE > data.length) break;
+      const ac = data[off];
+      if (ac === 127 || ac === 0) break;
+      const b1 = data[off + 1];
+      const tp16 = view.getUint16(off + 2, false);
+      tickPositions.push((b1 & 0x01) * 0x10000 + tp16);
+    }
+    let TICKS_PER_BAR = ticksPerMeasure > 0 ? ticksPerMeasure : 768;
+    if (tickPositions.length >= 2) {
+      // The minimum non-zero delta between consecutive entries = 1 bar
+      let minDelta = Infinity;
+      for (let i = 1; i < tickPositions.length; i++) {
+        const d = tickPositions[i] - tickPositions[i - 1];
+        if (d > 0 && d < minDelta) minDelta = d;
+      }
+      if (minDelta < Infinity && minDelta >= 48) TICKS_PER_BAR = minDelta;
+    }
+    let baseTick = -1;
+
+    for (let e = 0; e < 64; e++) {
+      const off = ARRANGE_TABLE_OFFSET + e * ARRANGE_ENTRY_SIZE;
+      if (off + ARRANGE_ENTRY_SIZE > data.length) break;
+
+      const aCol = data[off]; // byte 0 = a column (1-based pattern index)
+      const byte1 = data[off + 1];
+      const tickPos16 = view.getUint16(off + 2, false);
+      const pageBit = byte1 & 0x01;
+      const tickPos = pageBit * 0x10000 + tickPos16;
+
+      // Read arrangement name: bytes 12-20 (9 chars, high-bit stripped)
+      // Byte 20 is the 9th name character (e.g., "chorus 1" has "1" at byte 20)
+      let name = "";
+      for (let j = 12; j <= 20; j++) {
+        const b = data[off + j] & 0x7f;
+        if (b >= 32 && b < 127) name += String.fromCharCode(b);
+      }
+      name = name.trim();
+
+      // End conditions
+      if (aCol === 127) break; // sentinel
+      if (aCol === 0 && (name === "stop" || name === "")) break;
+
+      if (baseTick < 0) baseTick = tickPos;
+      const bar = Math.floor((tickPos - baseTick) / TICKS_PER_BAR) + 1;
+
+      // Use arrangement name; fall back to pattern name
+      const pattern = patterns.find((p) => p.index === aCol - 1);
+      const displayName =
+        name &&
+        !DEFAULT_PATTERN_NAMES.some((d) => name.startsWith(d.replace(/:$/, "")))
+          ? name
+          : (pattern?.name ?? `Pattern ${aCol}`);
+
+      // b/c/d columns — currently not decoded (byte 21+ are post-name config)
+
+      entries.push({
+        patternIndex: aCol - 1, // Convert to 0-based
+        bar,
+        length: 1, // Will be recomputed below
+        name: displayName,
+        columns: { a: aCol, b: 0, c: 0, d: 0 },
+      });
+    }
+
+    // Compute bar lengths from consecutive entry positions
+    for (let i = 0; i < entries.length - 1; i++) {
+      entries[i].length = entries[i + 1].bar - entries[i].bar;
+    }
+    // Last entry gets a default length of 1
+    if (entries.length > 0) {
+      entries[entries.length - 1].length = Math.max(
+        1,
+        entries.length > 1 ? entries[entries.length - 2].length : 4,
+      );
+    }
   }
 
-  if (f0Values.length === 0) {
-    // No arrangement data — create a simple 1-entry-per-pattern arrangement
+  if (entries.length === 0) {
+    // ── Fallback: one entry per pattern in order ───────────────
     let bar = 1;
     for (const pat of patterns) {
       if (pat.tracks.length === 0) continue;
@@ -785,63 +1088,15 @@ function parseArrangement(
         bar,
         length: barLength,
         name: pat.name,
+        columns: { a: pat.index + 1, b: 0, c: 0, d: 0 },
       });
       bar += barLength;
     }
-    return entries;
-  }
-
-  // ── Read EF entries (arrangement end markers) ───────────────
-  const EF_START = ARRANGE_OFFSET + 0x40; // 0x03B0
-  const EF_END = ARRANGE_OFFSET + 0x68; // 0x03D8
-  const efValues: number[] = [];
-
-  for (let off = EF_START; off < EF_END; off += 4) {
-    if (off + 4 > data.length) break;
-    const val = view.getUint32(off, false);
-    if (val === 0) break;
-    const marker = val & 0xff;
-    if (marker !== 0xef) break;
-    const refByte = (val >> 8) & 0xff;
-    efValues.push(refByte);
-  }
-
-  // ── Decode arrangement entries ──────────────────────────────
-  // Find the base value to calculate pattern indices.
-  // The sorted F0 values increment by 12 from the smallest.
-  const sortedF0 = [...f0Values].sort((a, b) => a - b);
-  const baseValue = sortedF0[0]; // smallest F0 value
-
-  let currentBar = 1;
-
-  for (let i = 0; i < f0Values.length; i++) {
-    const f0 = f0Values[i];
-    const ef = i < efValues.length ? efValues[i] : f0 + 12;
-
-    // Calculate bar length from EF - F0 difference
-    const barLength = Math.max(1, ef - f0);
-
-    // Calculate pattern index: (value - base) / 12
-    const rawIndex = Math.round((f0 - baseValue) / 12);
-    const patternIndex = Math.max(0, Math.min(rawIndex, patterns.length - 1));
-
-    // Use the pattern name if available
-    const pattern = patterns[patternIndex];
-    const name = pattern ? pattern.name : `Pattern ${patternIndex + 1}`;
-
-    entries.push({
-      patternIndex,
-      bar: currentBar,
-      length: barLength,
-      name,
-    });
-
-    currentBar += barLength;
   }
 
   console.log(
     `[Parser] Arrangement: ${entries.length} entries, ` +
-      `${currentBar - 1} total bars`,
+      `${entries.length > 0 ? entries[entries.length - 1].bar + entries[entries.length - 1].length - 1 : 0} total bars`,
   );
 
   return entries;

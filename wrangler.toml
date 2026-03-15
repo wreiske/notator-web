@@ -1,0 +1,19 @@
+name = "notator"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "out"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "notator-db"
+database_id = "f49b2efb-a1f1-45f7-815a-6bc766fdeb88"
+
+# R2 Storage
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "notator"
+
+# Environment variables (set via Cloudflare dashboard or wrangler secret)
+# MAILGUN_API_KEY = "key-..."
+# MAILGUN_DOMAIN = "mg.notator.online"
+# JWT_SECRET = "..."

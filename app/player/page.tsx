@@ -27,6 +27,10 @@ import {
   exportTrackToMidi,
   downloadMidi,
 } from "@/lib/midi/midi-file-export";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { LoginModal } from "@/components/auth/LoginModal";
+import { UserMenu } from "@/components/auth/UserMenu";
+import { PublishModal } from "@/components/songs/PublishModal";
 
 /** Demo .SON files bundled from the /st directory */
 const DEMO_FILES = [
@@ -58,12 +62,20 @@ function midiNoteName(note: number): string {
 }
 
 export default function PlayerPage() {
+  const { isAuthenticated } = useAuth();
+
   // Song state (sonFile preserved for future write-back/export)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [sonFile, setSonFile] = useState<SonFile | null>(null);
   const [song, setSong] = useState<SongData | null>(null);
   const [songName, setSongName] = useState("");
+  const [songBuffer, setSongBuffer] = useState<ArrayBuffer | null>(null);
+  const [songFileName, setSongFileName] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Auth / Community UI state
+  const [showLogin, setShowLogin] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
 
   // Playback state
   const [playbackState, setPlaybackState] = useState<PlaybackState>("stopped");
@@ -142,8 +154,9 @@ export default function PlayerPage() {
         setActiveTrackIndices(new Set());
         // Update the displayed song to show the new pattern's tracks
         setSong((prev) => {
-          if (!prev || patternIndex >= prev.patterns.length) return prev;
-          const pattern = prev.patterns[patternIndex];
+          if (!prev) return prev;
+          const pattern = prev.patterns.find((p) => p.index === patternIndex);
+          if (!pattern) return prev;
           return {
             ...prev,
             tracks: pattern.tracks,
@@ -196,6 +209,8 @@ export default function PlayerPage() {
         setSonFile(parsed);
         setSong(parsed.songData);
         setSongName(fileName.replace(/\.son$/i, ""));
+        setSongBuffer(buffer.slice(0)); // Store a copy for publishing
+        setSongFileName(fileName);
         setMutedTracks(new Set());
         setSoloedTracks(new Set());
         setActiveTrackIndices(new Set());
@@ -755,16 +770,27 @@ export default function PlayerPage() {
         onExportMidi={handleExportMidi}
       />
 
+      {/* Auth + Publish buttons */}
+      <div className="flex items-center gap-2 border-b border-notator-border bg-notator-surface px-3 py-1">
+        <div className="flex-1" />
+        {song && isAuthenticated && (
+          <button
+            onClick={() => setShowPublish(true)}
+            className="notator-btn rounded border-notator-green/50 px-3 py-1 text-[10px] text-notator-green transition-colors hover:border-notator-green hover:bg-notator-green/10"
+            id="publish-song-btn"
+          >
+            🌍 Share with Community
+          </button>
+        )}
+        <UserMenu onLoginClick={() => setShowLogin(true)} />
+      </div>
+
       {/* 3-Panel body */}
       <div className="flex flex-1 overflow-hidden">
         {/* ─── LEFT PANEL: ARRANGE (Arrangement List) ─── */}
-        <aside className="flex w-52 flex-shrink-0 flex-col border-r border-notator-border-bright bg-notator-panel">
+        <aside className="flex w-72 flex-shrink-0 flex-col border-r border-notator-border-bright bg-notator-panel">
           {/* Panel header */}
-          <div className="flex items-center justify-between border-b border-notator-border px-3 py-1.5">
-            <div className="flex gap-3 text-[10px] font-bold uppercase tracking-widest text-notator-text-dim">
-              <span>Bar</span>
-              <span>Arrange</span>
-            </div>
+          <div className="flex items-center justify-end border-b border-notator-border px-3 py-1.5">
             <button
               onClick={() => {
                 engineRef.current?.stop();
@@ -781,6 +807,16 @@ export default function PlayerPage() {
           {/* Arrangement list */}
           <div className="flex-1 overflow-y-auto">
             <table className="w-full font-mono text-[11px]">
+              <thead className="sticky top-0 bg-notator-panel text-[10px] font-bold uppercase tracking-widest text-notator-text-dim">
+                <tr className="border-b border-notator-border">
+                  <th className="w-8 px-2 py-1 text-right font-bold">Bar</th>
+                  <th className="px-2 py-1 text-left font-bold">Arrange</th>
+                  <th className="w-5 py-1 text-center font-bold">a</th>
+                  <th className="w-5 py-1 text-center font-bold">b</th>
+                  <th className="w-5 py-1 text-center font-bold">c</th>
+                  <th className="w-5 py-1 text-center font-bold">d</th>
+                </tr>
+              </thead>
               <tbody>
                 {song.arrangement.length > 0
                   ? song.arrangement.map((entry, idx) => (
@@ -800,8 +836,17 @@ export default function PlayerPage() {
                           {entry.bar}
                         </td>
                         <td className="px-2 py-1.5 font-bold">{entry.name}</td>
-                        <td className="w-6 px-2 py-1.5 text-right text-notator-text-dim">
-                          {entry.patternIndex + 1}
+                        <td className="w-5 py-1.5 text-center text-notator-text-dim">
+                          {entry.columns.a || ""}
+                        </td>
+                        <td className="w-5 py-1.5 text-center text-notator-text-dim">
+                          {entry.columns.b || ""}
+                        </td>
+                        <td className="w-5 py-1.5 text-center text-notator-text-dim">
+                          {entry.columns.c || ""}
+                        </td>
+                        <td className="w-5 py-1.5 text-center text-notator-text-dim">
+                          {entry.columns.d || ""}
                         </td>
                       </tr>
                     ))
@@ -870,8 +915,8 @@ export default function PlayerPage() {
             </span>
             <span className="text-notator-text-dim">·</span>
             <span className="text-notator-accent">
-              {song.patterns[activePatternIndex]?.name ||
-                `Pattern ${activePatternIndex + 1}`}
+              {song.patterns.find((p) => p.index === activePatternIndex)
+                ?.name || `Pattern ${activePatternIndex + 1}`}
             </span>
             <span className="ml-auto">
               <button
@@ -1268,6 +1313,15 @@ export default function PlayerPage() {
           onToggleSolo={handleEditorToggleSolo}
         />
       )}
+
+      {/* Auth & Publish Modals */}
+      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+      <PublishModal
+        isOpen={showPublish}
+        onClose={() => setShowPublish(false)}
+        songBuffer={songBuffer}
+        songFileName={songFileName}
+      />
     </div>
   );
 }

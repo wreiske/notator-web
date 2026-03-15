@@ -298,7 +298,8 @@ export class PlaybackEngine {
     this.stopScheduler();
     this.silenceAll();
 
-    const pattern = this.song.patterns[patternIndex];
+    const pattern = this.song.patterns.find((p) => p.index === patternIndex);
+    if (!pattern) return;
     this.currentPatternIndex = patternIndex;
     this.currentEntryTotalTicks = pattern.totalTicks;
 
@@ -425,11 +426,24 @@ export class PlaybackEngine {
     if (arrangementIndex < 0 || arrangementIndex >= arrangement.length) return;
 
     const entry: ArrangementEntry = arrangement[arrangementIndex];
-    const pattern = this.song.patterns[entry.patternIndex];
+    const pattern = this.song.patterns.find(
+      (p) => p.index === entry.patternIndex,
+    );
 
     if (!pattern) {
       console.warn(
         `[Engine] Arrangement entry ${arrangementIndex} references missing pattern ${entry.patternIndex}`,
+      );
+      // Still update state so the UI responds to the click
+      this.currentArrangementIndex = arrangementIndex;
+      this.currentPatternIndex = entry.patternIndex;
+      this.currentEntryTotalTicks =
+        entry.length * (this.song.ticksPerMeasure || 768);
+      this.scheduledTracks = [];
+      this.callbacks.onPatternChange?.(entry.patternIndex);
+      this.callbacks.onArrangementChange?.(
+        arrangementIndex,
+        entry.patternIndex,
       );
       return;
     }
@@ -614,7 +628,9 @@ export class PlaybackEngine {
     }
 
     // Use current pattern tracks if available, otherwise fall back to song.tracks
-    const pattern = this.song.patterns[this.currentPatternIndex];
+    const pattern = this.song.patterns.find(
+      (p) => p.index === this.currentPatternIndex,
+    );
     const tracks = pattern ? pattern.tracks : this.song.tracks;
 
     this.scheduledTracks = tracks.map((track) => ({

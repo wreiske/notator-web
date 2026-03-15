@@ -1,0 +1,2 @@
+# Phase 2: API upload
+requests>=2.28

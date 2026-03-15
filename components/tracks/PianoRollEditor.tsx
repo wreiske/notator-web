@@ -262,6 +262,13 @@ export function PianoRollEditor({
     endY: number;
   } | null>(null);
 
+  // Velocity drawing state
+  const [velDraw, setVelDraw] = useState<{
+    active: boolean;
+    mouseY: number; // canvas-local Y for guide line
+    mouseX: number; // canvas-local X for tooltip positioning
+  }>({ active: false, mouseY: -1, mouseX: -1 });
+
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -275,7 +282,7 @@ export function PianoRollEditor({
   const GUTTER_WIDTH = 52;
   const NOTE_HEIGHT = 14;
   const PIXELS_PER_BEAT = 40;
-  const VELOCITY_HEIGHT = 60;
+  const VELOCITY_HEIGHT = 100;
   const RULER_HEIGHT = 28;
   const TOTAL_NOTES = 128;
   const snapTicks = ticksPerBeat / SNAP_OPTIONS[snapIndex].divisor;
@@ -569,6 +576,9 @@ export function PianoRollEditor({
     canvas.style.height = `${VELOCITY_HEIGHT}px`;
     ctx.scale(dpr, dpr);
 
+    const PAD = 4; // top/bottom padding inside velocity lane
+    const drawH = VELOCITY_HEIGHT - PAD * 2; // usable drawing height
+
     ctx.fillStyle = "#050520";
     ctx.fillRect(0, 0, canvasWidth, VELOCITY_HEIGHT);
 
@@ -584,14 +594,88 @@ export function PianoRollEditor({
     ctx.lineTo(GUTTER_WIDTH - 0.5, VELOCITY_HEIGHT);
     ctx.stroke();
 
+    // Horizontal guide lines at 32, 64, 96, 127
+    const guideLevels = [32, 64, 96, 127];
+    for (const level of guideLevels) {
+      const gy = VELOCITY_HEIGHT - PAD - (level / 127) * drawH;
+      ctx.strokeStyle = "#2a3f9930";
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(GUTTER_WIDTH, gy);
+      ctx.lineTo(canvasWidth, gy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Guide label in gutter
+      ctx.fillStyle = "#4466aa55";
+      ctx.font = "7px 'IBM Plex Mono', monospace";
+      ctx.fillText(String(level), 4, gy + 3);
+    }
+    ctx.lineWidth = 1;
+
     // Velocity bars
+    const BAR_W = 6;
     for (const n of notes) {
       const x = tickToX(n.startTick);
-      const barH = (n.velocity / 127) * (VELOCITY_HEIGHT - 4);
+      const barH = (n.velocity / 127) * drawH;
       const isSelected = selectedIds.has(n.id);
 
-      ctx.fillStyle = isSelected ? "#ffbb44cc" : "#4488ffaa";
-      ctx.fillRect(x, VELOCITY_HEIGHT - barH - 2, 4, barH);
+      // Velocity color gradient: low=blue, mid=green, high=orange/red
+      let barColor: string;
+      if (isSelected) {
+        barColor = "#ffbb44dd";
+      } else {
+        const v = n.velocity / 127;
+        if (v < 0.4) barColor = `rgba(68, 136, 255, ${0.6 + v})`;
+        else if (v < 0.75) barColor = `rgba(68, 200, 136, ${0.5 + v * 0.5})`;
+        else
+          barColor = `rgba(255, ${Math.round(180 - v * 80)}, 68, ${0.7 + v * 0.3})`;
+      }
+
+      ctx.fillStyle = barColor;
+      ctx.fillRect(x - BAR_W / 2, VELOCITY_HEIGHT - PAD - barH, BAR_W, barH);
+
+      // Velocity value label on top of bar (if selected)
+      if (isSelected) {
+        ctx.fillStyle = "#ffdd88";
+        ctx.font = "bold 7px 'IBM Plex Mono', monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(String(n.velocity), x, VELOCITY_HEIGHT - PAD - barH - 3);
+        ctx.textAlign = "left";
+      }
+    }
+
+    // Velocity draw guide line (horizontal line at mouse Y)
+    if (velDraw.mouseY >= 0) {
+      const gy = velDraw.mouseY;
+      ctx.strokeStyle = "#ffbb4488";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(GUTTER_WIDTH, gy);
+      ctx.lineTo(canvasWidth, gy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Compute velocity from Y for tooltip
+      const velFromY = Math.round(
+        Math.max(
+          0,
+          Math.min(127, ((VELOCITY_HEIGHT - PAD - gy) / drawH) * 127),
+        ),
+      );
+      // Tooltip near mouse
+      ctx.fillStyle = "#0c0c3dee";
+      ctx.fillRect(velDraw.mouseX + 10, gy - 10, 32, 16);
+      ctx.strokeStyle = "#ffbb44";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(velDraw.mouseX + 10, gy - 10, 32, 16);
+      ctx.fillStyle = "#ffbb44";
+      ctx.font = "bold 9px 'IBM Plex Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(String(velFromY), velDraw.mouseX + 26, gy + 2);
+      ctx.textAlign = "left";
+      ctx.lineWidth = 1;
     }
 
     // Playback cursor line through velocity lane
@@ -607,7 +691,7 @@ export function PianoRollEditor({
         ctx.lineWidth = 1;
       }
     }
-  }, [notes, selectedIds, canvasWidth, tickToX, currentTick]);
+  }, [notes, selectedIds, canvasWidth, tickToX, currentTick, velDraw]);
 
   // ─── Note preview ─────────────────────────────────────────────────
   const previewNote = useCallback(
@@ -1051,6 +1135,171 @@ export function PianoRollEditor({
     setMarquee(null);
     lastPreviewNoteRef.current = -1;
   }, []);
+
+  // ─── Velocity lane mouse handlers ─────────────────────────────────
+  const getVelCanvasCoords = useCallback(
+    (e: React.MouseEvent) => {
+      const canvas = velocityCanvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvasWidth / rect.width;
+      const scaleY = VELOCITY_HEIGHT / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
+    },
+    [canvasWidth],
+  );
+
+  const velYToVelocity = useCallback((y: number) => {
+    const PAD = 4;
+    const drawH = VELOCITY_HEIGHT - PAD * 2;
+    return Math.round(
+      Math.max(1, Math.min(127, ((VELOCITY_HEIGHT - PAD - y) / drawH) * 127)),
+    );
+  }, []);
+
+  const applyVelocityAtX = useCallback(
+    (x: number, vel: number) => {
+      // Find selected notes near this X and set their velocity
+      const SNAP_RADIUS = 20; // pixels
+      setNotes((prev) =>
+        prev.map((n) => {
+          if (!selectedIds.has(n.id)) return n;
+          const nx = tickToX(n.startTick);
+          if (Math.abs(nx - x) <= SNAP_RADIUS) {
+            return { ...n, velocity: vel };
+          }
+          return n;
+        }),
+      );
+      setIsDirty(true);
+    },
+    [selectedIds, tickToX],
+  );
+
+  const handleVelMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      const { x, y } = getVelCanvasCoords(e);
+      if (x < GUTTER_WIDTH) return;
+      if (selectedIds.size === 0) return;
+
+      pushHistory("Edit velocity");
+      const vel = velYToVelocity(y);
+      setVelDraw({ active: true, mouseY: y, mouseX: x });
+      applyVelocityAtX(x, vel);
+    },
+    [
+      getVelCanvasCoords,
+      selectedIds,
+      pushHistory,
+      velYToVelocity,
+      applyVelocityAtX,
+    ],
+  );
+
+  const handleVelMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const { x, y } = getVelCanvasCoords(e);
+      if (x < GUTTER_WIDTH) {
+        setVelDraw((prev) => ({ ...prev, mouseY: -1, mouseX: -1 }));
+        return;
+      }
+
+      if (velDraw.active) {
+        const vel = velYToVelocity(y);
+        setVelDraw({ active: true, mouseY: y, mouseX: x });
+        applyVelocityAtX(x, vel);
+      } else {
+        // Just hovering — show guide line
+        setVelDraw((prev) => ({ ...prev, mouseY: y, mouseX: x }));
+      }
+    },
+    [getVelCanvasCoords, velDraw.active, velYToVelocity, applyVelocityAtX],
+  );
+
+  const handleVelMouseUp = useCallback(() => {
+    setVelDraw({ active: false, mouseY: -1, mouseX: -1 });
+  }, []);
+
+  const handleVelMouseLeave = useCallback(() => {
+    setVelDraw({ active: false, mouseY: -1, mouseX: -1 });
+  }, []);
+
+  // ─── Velocity preset tools ────────────────────────────────────────
+  const handleVelocityRampUp = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    pushHistory("Velocity ramp up");
+    const sorted = notes
+      .filter((n) => selectedIds.has(n.id))
+      .sort((a, b) => a.startTick - b.startTick);
+    const count = sorted.length;
+    const idToVel = new Map<number, number>();
+    sorted.forEach((n, i) => {
+      idToVel.set(
+        n.id,
+        count === 1 ? 127 : Math.round(1 + (126 * i) / (count - 1)),
+      );
+    });
+    setNotes((prev) =>
+      prev.map((n) =>
+        idToVel.has(n.id) ? { ...n, velocity: idToVel.get(n.id)! } : n,
+      ),
+    );
+    setIsDirty(true);
+  }, [selectedIds, notes, pushHistory]);
+
+  const handleVelocityRampDown = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    pushHistory("Velocity ramp down");
+    const sorted = notes
+      .filter((n) => selectedIds.has(n.id))
+      .sort((a, b) => a.startTick - b.startTick);
+    const count = sorted.length;
+    const idToVel = new Map<number, number>();
+    sorted.forEach((n, i) => {
+      idToVel.set(
+        n.id,
+        count === 1 ? 127 : Math.round(127 - (126 * i) / (count - 1)),
+      );
+    });
+    setNotes((prev) =>
+      prev.map((n) =>
+        idToVel.has(n.id) ? { ...n, velocity: idToVel.get(n.id)! } : n,
+      ),
+    );
+    setIsDirty(true);
+  }, [selectedIds, notes, pushHistory]);
+
+  const handleVelocityHumanize = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    pushHistory("Humanize velocity");
+    setNotes((prev) =>
+      prev.map((n) => {
+        if (!selectedIds.has(n.id)) return n;
+        const jitter = Math.round((Math.random() - 0.5) * 30); // ±15
+        return {
+          ...n,
+          velocity: Math.max(1, Math.min(127, n.velocity + jitter)),
+        };
+      }),
+    );
+    setIsDirty(true);
+  }, [selectedIds, pushHistory]);
+
+  const handleVelocityFix = useCallback(
+    (vel: number) => {
+      if (selectedIds.size === 0) return;
+      pushHistory(`Set velocity ${vel}`);
+      setNotes((prev) =>
+        prev.map((n) => (selectedIds.has(n.id) ? { ...n, velocity: vel } : n)),
+      );
+      setIsDirty(true);
+    },
+    [selectedIds, pushHistory],
+  );
 
   // ─── Ruler mouse handler ──────────────────────────────────────────
   const handleRulerMouseDown = useCallback(
@@ -1509,6 +1758,72 @@ export function PianoRollEditor({
             </div>
           </div>
 
+          {/* Velocity Tools */}
+          <div className="px-3 py-2 border-b border-notator-border">
+            <div className="text-[9px] font-bold uppercase tracking-widest text-notator-text-dim mb-2">
+              Velocity
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                onClick={handleVelocityRampUp}
+                className="notator-btn rounded px-2 py-1 text-[9px] border-notator-border text-notator-text-dim hover:text-notator-text"
+                disabled={selectedIds.size === 0}
+                title="Crescendo: linearly ramp velocity from 1 → 127"
+                id="vel-ramp-up"
+              >
+                ↗ Ramp Up
+              </button>
+              <button
+                onClick={handleVelocityRampDown}
+                className="notator-btn rounded px-2 py-1 text-[9px] border-notator-border text-notator-text-dim hover:text-notator-text"
+                disabled={selectedIds.size === 0}
+                title="Diminuendo: linearly ramp velocity from 127 → 1"
+                id="vel-ramp-down"
+              >
+                ↘ Ramp Down
+              </button>
+              <button
+                onClick={handleVelocityHumanize}
+                className="notator-btn rounded px-2 py-1 text-[9px] border-notator-border text-notator-text-dim hover:text-notator-text"
+                disabled={selectedIds.size === 0}
+                title="Add ±15 random jitter to velocities"
+                id="vel-humanize"
+              >
+                🎲 Humanize
+              </button>
+              <button
+                onClick={() => handleVelocityFix(127)}
+                className="notator-btn rounded px-2 py-1 text-[9px] border-notator-border text-notator-text-dim hover:text-notator-text"
+                disabled={selectedIds.size === 0}
+                title="Set all selected to velocity 127"
+                id="vel-fix-127"
+              >
+                Fix 127
+              </button>
+              <button
+                onClick={() => handleVelocityFix(100)}
+                className="notator-btn rounded px-2 py-1 text-[9px] border-notator-border text-notator-text-dim hover:text-notator-text"
+                disabled={selectedIds.size === 0}
+                title="Set all selected to velocity 100"
+                id="vel-fix-100"
+              >
+                Fix 100
+              </button>
+              <button
+                onClick={() => handleVelocityFix(64)}
+                className="notator-btn rounded px-2 py-1 text-[9px] border-notator-border text-notator-text-dim hover:text-notator-text"
+                disabled={selectedIds.size === 0}
+                title="Set all selected to velocity 64"
+                id="vel-fix-64"
+              >
+                Fix 64
+              </button>
+            </div>
+            <div className="text-[8px] text-notator-text-dim mt-1.5 opacity-60">
+              Draw velocity in the lane below ↓
+            </div>
+          </div>
+
           {/* Loop Region (sidebar control) */}
           <div className="px-3 py-2 border-b border-notator-border">
             <div className="text-[9px] font-bold uppercase tracking-widest text-notator-text-dim mb-2">
@@ -1703,9 +2018,18 @@ export function PianoRollEditor({
             {/* Velocity lane */}
             <div
               className="border-t border-notator-border flex-shrink-0"
-              style={{ height: VELOCITY_HEIGHT }}
+              style={{
+                height: VELOCITY_HEIGHT,
+                cursor: selectedIds.size > 0 ? "crosshair" : "default",
+              }}
             >
-              <canvas ref={velocityCanvasRef} />
+              <canvas
+                ref={velocityCanvasRef}
+                onMouseDown={handleVelMouseDown}
+                onMouseMove={handleVelMouseMove}
+                onMouseUp={handleVelMouseUp}
+                onMouseLeave={handleVelMouseLeave}
+              />
             </div>
           </div>
         </div>

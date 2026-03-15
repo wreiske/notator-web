@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Providers } from "@/components/Providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,9 +15,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://notator.online"),
-  title: "Notator Web — Atari ST MIDI Sequencer in the Browser",
+  title: "Notator Web — Atari ST MIDI Sequencer Community",
   description:
-    "Play and explore Notator SL .SON files directly in your browser using Web MIDI and Web Audio. A modern tribute to the legendary Atari ST sequencer.",
+    "Play, share, and archive Notator SL .SON files with the Atari ST community. Upload your songs, discover music, and connect with fellow Notator users.",
   keywords: [
     "Notator",
     "Notator SL",
@@ -27,20 +28,22 @@ export const metadata: Metadata = {
     ".SON files",
     "music",
     "retro",
+    "community",
+    "archive",
   ],
   openGraph: {
-    title: "Notator Web — Atari ST MIDI Sequencer in the Browser",
+    title: "Notator Web — Atari ST MIDI Sequencer Community",
     description:
-      "Play and explore Notator SL .SON files directly in your browser using Web MIDI and Web Audio.",
+      "Play, share, and archive Notator SL .SON files with the Atari ST community.",
     url: "https://notator.online",
     siteName: "Notator Web",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Notator Web — Atari ST MIDI Sequencer in the Browser",
+    title: "Notator Web — Atari ST MIDI Sequencer Community",
     description:
-      "Play and explore Notator SL .SON files directly in your browser.",
+      "Play, share, and archive Notator SL .SON files with the Atari ST community.",
   },
 };
 
@@ -54,7 +57,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
