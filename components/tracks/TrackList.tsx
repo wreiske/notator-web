@@ -23,6 +23,8 @@ interface TrackListProps {
   onToggleMute: (index: number) => void;
   onToggleSolo: (index: number) => void;
   onSelectTrack: (index: number) => void;
+  onTrackContextMenu?: (index: number, x: number, y: number) => void;
+  onTrackDoubleClick?: (index: number) => void;
 }
 
 export function TrackList({
@@ -34,6 +36,8 @@ export function TrackList({
   onToggleMute,
   onToggleSolo,
   onSelectTrack,
+  onTrackContextMenu,
+  onTrackDoubleClick,
 }: TrackListProps) {
   if (tracks.length === 0) {
     return (
@@ -76,6 +80,12 @@ export function TrackList({
               <tr
                 key={index}
                 onClick={() => onSelectTrack(index)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  onSelectTrack(index);
+                  onTrackContextMenu?.(index, e.clientX, e.clientY);
+                }}
+                onDoubleClick={() => onTrackDoubleClick?.(index)}
                 className={`
                   group cursor-pointer text-[11px] transition-colors
                   ${

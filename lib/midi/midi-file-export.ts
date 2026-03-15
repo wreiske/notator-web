@@ -41,15 +41,113 @@ export function exportSongToMidi(
   // ─── Track 0: Conductor (tempo, time sig, song name) ────────────
   trackChunks.push(buildConductorTrack(song, songName));
 
-  // ─── Tracks 1–N: One per SON track ──────────────────────────────
-  for (const track of song.tracks) {
-    trackChunks.push(
-      buildMidiTrack(track.events, track.channel, track.name, song)
-    );
+  // ─── Check if we should flatten the arrangement ─────────────────
+  if (song.arrangement.length > 0) {
+    // Flatten the arrangement into merged tracks by channel
+    const mergedTracks = flattenArrangement(song);
+    for (const mt of mergedTracks) {
+      trackChunks.push(
+        buildMidiTrack(mt.events, mt.channel, mt.name, song)
+      );
+    }
+  } else {
+    // ── Fallback: single pattern export ───────────────────────────
+    for (const track of song.tracks) {
+      trackChunks.push(
+        buildMidiTrack(track.events, track.channel, track.name, song)
+      );
+    }
   }
 
   // ─── Assemble the complete file ─────────────────────────────────
   return buildSmfFile(ppqn, trackChunks);
+}
+
+/**
+ * Export a single track to a Standard MIDI File (Type 0) byte array.
+ *
+ * @param song - Parsed song data (for tempo, time sig, channel config)
+ * @param trackIndex - Index of the track to export
+ * @param songName - Optional song name for metadata
+ * @returns Uint8Array containing the complete .mid file
+ */
+export function exportTrackToMidi(
+  song: SongData,
+  trackIndex: number,
+  songName?: string
+): Uint8Array {
+  const track = song.tracks[trackIndex];
+  if (!track) throw new Error(`Track ${trackIndex} not found`);
+
+  const ppqn = song.ticksPerBeat || 192;
+  const trackChunks: Uint8Array[] = [];
+
+  const label = songName
+    ? `${songName} - ${track.name || `Track ${trackIndex + 1}`}`
+    : track.name || `Track ${trackIndex + 1}`;
+
+  trackChunks.push(buildConductorTrack(song, label));
+  trackChunks.push(buildMidiTrack(track.events, track.channel, track.name, song));
+
+  return buildSmfFile(ppqn, trackChunks);
+}
+
+/**
+ * Flatten the arrangement into a set of merged tracks.
+ * Walks through arrangement entries in order, copying each referenced
+ * pattern's events at the correct tick offset.
+ */
+function flattenArrangement(
+  song: SongData
+): { events: TrackEvent[]; channel: number; name: string }[] {
+  const ticksPerMeasure = song.ticksPerMeasure || 768;
+
+  // Accumulate events by channel, keyed by "channel:trackName"
+  const channelMap = new Map<
+    string,
+    { events: TrackEvent[]; channel: number; name: string }
+  >();
+
+  let tickOffset = 0;
+
+  for (const entry of song.arrangement) {
+    const pattern = song.patterns[entry.patternIndex];
+    if (!pattern) continue;
+
+    const entryDurationTicks = entry.length * ticksPerMeasure;
+
+    for (const track of pattern.tracks) {
+      const key = `${track.channel}:${track.name}`;
+
+      if (!channelMap.has(key)) {
+        channelMap.set(key, {
+          events: [],
+          channel: track.channel,
+          name: track.name,
+        });
+      }
+
+      const merged = channelMap.get(key)!;
+
+      // Copy events with tick offset, clamping to entry duration
+      for (const event of track.events) {
+        if (event.tick >= entryDurationTicks) continue;
+        merged.events.push({
+          ...event,
+          tick: event.tick + tickOffset,
+        } as TrackEvent);
+      }
+    }
+
+    tickOffset += entryDurationTicks;
+  }
+
+  // Sort events by tick within each merged track
+  for (const mt of channelMap.values()) {
+    mt.events.sort((a, b) => a.tick - b.tick);
+  }
+
+  return Array.from(channelMap.values());
 }
 
 /**

@@ -267,3 +267,140 @@ body {
     transform: scale(1);
   }
 }
+
+/* ═══ Context Menu ═══ */
+
+.notator-context-menu {
+  position: fixed;
+  z-index: 300;
+  min-width: 210px;
+  padding: 3px 0;
+  background: var(--color-notator-panel);
+  border: 1px solid var(--color-notator-border-bright);
+  box-shadow:
+    3px 3px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px var(--color-notator-border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  animation: notator-scale-in 0.1s ease;
+}
+
+.notator-context-menu-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-notator-text-dim);
+  border-bottom: 1px solid var(--color-notator-border);
+  margin-bottom: 3px;
+}
+
+/* Submenu container */
+.notator-submenu-container {
+  position: relative;
+}
+
+.notator-submenu {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: -3px;
+  min-width: 180px;
+  padding: 3px 0;
+  background: var(--color-notator-panel);
+  border: 1px solid var(--color-notator-border-bright);
+  box-shadow:
+    3px 3px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px var(--color-notator-border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.notator-submenu-container:hover > .notator-submenu {
+  display: block;
+}
+
+.notator-submenu-trigger {
+  cursor: pointer;
+}
+
+/* ═══ Piano Roll Editor ═══ */
+
+.notator-piano-roll-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-notator-bg-deep);
+  animation: notator-fade-in 0.15s ease;
+}
+
+.notator-piano-roll-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--color-notator-surface);
+  border-bottom: 1px solid var(--color-notator-border-bright);
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.notator-piano-roll-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  background: var(--color-notator-panel);
+  border-right: 1px solid var(--color-notator-border-bright);
+  overflow-y: auto;
+}
+
+.notator-piano-roll-select {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--color-notator-bg);
+  color: var(--color-notator-text);
+  border: 1px solid var(--color-notator-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.notator-piano-roll-select:focus {
+  outline: none;
+  border-color: var(--color-notator-accent);
+}
+
+.notator-piano-roll-tool-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  width: 26px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-notator-bg);
+  color: var(--color-notator-text-dim);
+  border: 1px solid var(--color-notator-border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.notator-piano-roll-tool-btn:hover {
+  color: var(--color-notator-text);
+  border-color: var(--color-notator-accent);
+}
+
+.notator-piano-roll-tool-active {
+  background: var(--color-notator-accent) !important;
+  color: white !important;
+  border-color: var(--color-notator-accent) !important;
+}
+
+

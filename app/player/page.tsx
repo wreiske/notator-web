@@ -4,12 +4,14 @@ import { useState, useCallback, useRef, useEffect, type ChangeEvent } from "reac
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { TransportBar } from "@/components/transport/TransportBar";
 import { TrackList } from "@/components/tracks/TrackList";
+import { TrackContextMenu } from "@/components/tracks/TrackContextMenu";
+import { PianoRollEditor } from "@/components/tracks/PianoRollEditor";
 import { NotationTimeline } from "@/components/tracks/NotationTimeline";
 import { parseSonFile } from "@/lib/son-parser";
-import type { SonFile, SongData, Track } from "@/lib/son-parser/types";
+import type { SonFile, SongData, Track, TrackEvent as SonTrackEvent } from "@/lib/son-parser/types";
 import { PlaybackEngine } from "@/lib/playback/engine";
 import type { PlaybackState } from "@/lib/playback/engine";
-import { exportSongToMidi, downloadMidi } from "@/lib/midi/midi-file-export";
+import { exportSongToMidi, exportTrackToMidi, downloadMidi } from "@/lib/midi/midi-file-export";
 
 /** Demo .SON files bundled from the /st directory */
 const DEMO_FILES = [
@@ -43,9 +45,27 @@ export default function PlayerPage() {
   const [soloedTracks, setSoloedTracks] = useState<Set<number>>(new Set());
   const [activeTrackIndices, setActiveTrackIndices] = useState<Set<number>>(new Set());
   const [activePatternIndex, setActivePatternIndex] = useState(0);
+  const [currentArrangementIndex, setCurrentArrangementIndex] = useState(0);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState(0);
   const [loopEnabled, setLoopEnabled] = useState(false);
   const [showTimeline, setShowTimeline] = useState(true);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    trackIndex: number;
+  } | null>(null);
+  const [trackClipboard, setTrackClipboard] = useState<Track | null>(null);
+
+  // Piano roll editor state
+  const [editingTrackIndex, setEditingTrackIndex] = useState<number | null>(null);
+  const [editorPlaybackState, setEditorPlaybackState] = useState<'stopped' | 'playing' | 'paused'>('stopped');
+  const [editorCurrentTick, setEditorCurrentTick] = useState(0);
+  const [editorLoopEnabled, setEditorLoopEnabled] = useState(false);
+  const [editorLoopStart, setEditorLoopStart] = useState(-1);
+  const [editorLoopEnd, setEditorLoopEnd] = useState(-1);
+  const [editorSoloed, setEditorSoloed] = useState(false);
 
   // Refs
   const engineRef = useRef<PlaybackEngine | null>(null);
@@ -56,7 +76,10 @@ export default function PlayerPage() {
     const engine = new PlaybackEngine();
     engine.setCallbacks({
       onStateChange: setPlaybackState,
-      onPositionChange: setCurrentTick,
+      onPositionChange: (tick: number) => {
+        setCurrentTick(tick);
+        setEditorCurrentTick(tick);
+      },
       onTrackEvent: (trackIndex: number) => {
         setActiveTrackIndices((prev) => {
           const next = new Set(prev);
@@ -87,6 +110,10 @@ export default function PlayerPage() {
           };
         });
       },
+      onArrangementChange: (arrangementIndex: number, patternIndex: number) => {
+        setCurrentArrangementIndex(arrangementIndex);
+        setActivePatternIndex(patternIndex);
+      },
     });
     engineRef.current = engine;
     return () => engine.destroy();
@@ -105,6 +132,7 @@ export default function PlayerPage() {
         setSoloedTracks(new Set());
         setActiveTrackIndices(new Set());
         setActivePatternIndex(0);
+        setCurrentArrangementIndex(0);
         setSelectedTrackIndex(0);
 
         if (engineRef.current) {
@@ -185,7 +213,7 @@ export default function PlayerPage() {
     downloadMidi(midiData, filename);
   }, [song, songName]);
 
-  // Switch active pattern
+  // Switch active pattern (from pattern list fallback)
   const handlePatternChange = useCallback(
     (patternIndex: number) => {
       if (!song || patternIndex < 0 || patternIndex >= song.patterns.length) return;
@@ -215,6 +243,15 @@ export default function PlayerPage() {
     [song, tempo]
   );
 
+  // Jump to a specific arrangement entry
+  const handleArrangementJump = useCallback(
+    (arrangementIndex: number) => {
+      if (!engineRef.current) return;
+      engineRef.current.jumpToArrangementEntry(arrangementIndex);
+    },
+    []
+  );
+
   // Track controls
   const handleToggleMute = useCallback(
     (index: number) => {
@@ -240,6 +277,275 @@ export default function PlayerPage() {
       });
     },
     []
+  );
+
+  // Context menu trigger
+  const handleTrackContextMenu = useCallback(
+    (trackIndex: number, x: number, y: number) => {
+      setContextMenu({ x, y, trackIndex });
+    },
+    []
+  );
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // Open piano roll editor
+  const handleOpenEditor = useCallback((trackIndex: number) => {
+    setContextMenu(null);
+    setEditingTrackIndex(trackIndex);
+  }, []);
+
+  // Save edited track from piano roll
+  const handleSaveEditor = useCallback(
+    (trackIndex: number, events: SonTrackEvent[]) => {
+      setSong((prev) => {
+        if (!prev) return prev;
+        const newTracks = [...prev.tracks];
+        newTracks[trackIndex] = { ...newTracks[trackIndex], events };
+        return { ...prev, tracks: newTracks };
+      });
+      setEditingTrackIndex(null);
+    },
+    []
+  );
+
+  const handleCloseEditor = useCallback(() => {
+    // Stop any editor playback
+    const engine = engineRef.current;
+    if (engine && editorPlaybackState !== 'stopped') {
+      engine.stop();
+      engine.setLoopRegion(-1, -1);
+    }
+    setEditorPlaybackState('stopped');
+    setEditorCurrentTick(0);
+    setEditorLoopEnabled(false);
+    setEditorLoopStart(-1);
+    setEditorLoopEnd(-1);
+    // Un-solo the track if it was soloed
+    if (editorSoloed && editingTrackIndex !== null) {
+      engineRef.current?.toggleSolo(editingTrackIndex);
+    }
+    setEditorSoloed(false);
+    setEditingTrackIndex(null);
+  }, [editorPlaybackState, editorSoloed, editingTrackIndex]);
+
+  // Editor note preview (supports chord: multiple notes at once)
+  const activePreviewsRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
+  const handlePreviewNote = useCallback(
+    (note: number, velocity: number) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      const synth = engine.getSynth();
+      engine.initSynth().then(() => {
+        const channel = song?.tracks[editingTrackIndex ?? 0]?.channel ?? 0;
+
+        // If this note is already previewing, stop it first
+        const existingTimer = activePreviewsRef.current.get(note);
+        if (existingTimer) {
+          clearTimeout(existingTimer);
+          synth.noteOff(channel, note);
+        }
+
+        synth.noteOn(channel, note, velocity);
+
+        // Auto-stop after 250ms
+        const timer = setTimeout(() => {
+          synth.noteOff(channel, note);
+          activePreviewsRef.current.delete(note);
+        }, 250);
+        activePreviewsRef.current.set(note, timer);
+      });
+    },
+    [song, editingTrackIndex]
+  );
+
+  // Editor playback controls
+  const handleEditorPlay = useCallback(() => {
+    engineRef.current?.play();
+    setEditorPlaybackState('playing');
+  }, []);
+
+  const handleEditorPause = useCallback(() => {
+    engineRef.current?.pause();
+    setEditorPlaybackState('paused');
+  }, []);
+
+  const handleEditorStop = useCallback(() => {
+    engineRef.current?.stop();
+    // Always reset to 0 (double-tap stop resets)
+    engineRef.current?.seekTo(0);
+    setEditorPlaybackState('stopped');
+    setEditorCurrentTick(0);
+  }, []);
+
+  const handleEditorSeek = useCallback((tick: number) => {
+    engineRef.current?.seekTo(tick);
+    setEditorCurrentTick(tick);
+  }, []);
+
+  const handleEditorToggleLoop = useCallback(() => {
+    setEditorLoopEnabled(prev => {
+      const next = !prev;
+      engineRef.current?.setLoop(next);
+      return next;
+    });
+  }, []);
+
+  const handleEditorSetLoopRegion = useCallback((start: number, end: number) => {
+    setEditorLoopStart(start);
+    setEditorLoopEnd(end);
+    engineRef.current?.setLoopRegion(start, end);
+  }, []);
+
+  const handleEditorToggleSolo = useCallback(() => {
+    if (editingTrackIndex === null) return;
+    engineRef.current?.toggleSolo(editingTrackIndex);
+    setEditorSoloed(prev => !prev);
+  }, [editingTrackIndex]);
+
+  // Export single track as MIDI
+  const handleExportTrackMidi = useCallback(
+    (trackIndex: number) => {
+      if (!song) return;
+      const track = song.tracks[trackIndex];
+      const trackLabel = track?.name || `Track ${trackIndex + 1}`;
+      const midiData = exportTrackToMidi(song, trackIndex, songName || undefined);
+      const filename = `${(songName || "export").replace(/\s+/g, "_")}_${trackLabel.replace(/\s+/g, "_")}.mid`;
+      downloadMidi(midiData, filename);
+    },
+    [song, songName]
+  );
+
+  // Copy track to clipboard
+  const handleCopyTrack = useCallback(
+    (trackIndex: number) => {
+      if (!song) return;
+      const track = song.tracks[trackIndex];
+      if (track) setTrackClipboard({ ...track, events: [...track.events] });
+    },
+    [song]
+  );
+
+  // Paste clipboard track onto target
+  const handlePasteTrack = useCallback(
+    (trackIndex: number) => {
+      if (!song || !trackClipboard) return;
+      setSong((prev) => {
+        if (!prev) return prev;
+        const newTracks = [...prev.tracks];
+        newTracks[trackIndex] = {
+          ...trackClipboard,
+          events: [...trackClipboard.events],
+        };
+        return { ...prev, tracks: newTracks };
+      });
+    },
+    [song, trackClipboard]
+  );
+
+  // Delete track
+  const handleDeleteTrack = useCallback(
+    (trackIndex: number) => {
+      if (!song || song.tracks.length <= 1) return;
+      setSong((prev) => {
+        if (!prev) return prev;
+        const newTracks = prev.tracks.filter((_, i) => i !== trackIndex);
+        return { ...prev, tracks: newTracks };
+      });
+      if (selectedTrackIndex >= song.tracks.length - 1) {
+        setSelectedTrackIndex(Math.max(0, song.tracks.length - 2));
+      }
+    },
+    [song, selectedTrackIndex]
+  );
+
+  // Cut track (copy + delete)
+  const handleCutTrack = useCallback(
+    (trackIndex: number) => {
+      if (!song) return;
+      const track = song.tracks[trackIndex];
+      if (track) setTrackClipboard({ ...track, events: [...track.events] });
+      handleDeleteTrack(trackIndex);
+    },
+    [song, handleDeleteTrack]
+  );
+
+  // Duplicate track (insert copy below with " 2" suffix)
+  const handleDuplicateTrack = useCallback(
+    (trackIndex: number) => {
+      if (!song) return;
+      const track = song.tracks[trackIndex];
+      if (!track) return;
+
+      // Determine suffix number
+      const baseName = track.name || `Track ${trackIndex + 1}`;
+      const match = baseName.match(/^(.+?)\s+(\d+)$/);
+      let newName: string;
+      if (match) {
+        newName = `${match[1]} ${parseInt(match[2]) + 1}`;
+      } else {
+        newName = `${baseName} 2`;
+      }
+
+      const duplicate: Track = {
+        ...track,
+        name: newName,
+        events: [...track.events],
+      };
+
+      setSong((prev) => {
+        if (!prev) return prev;
+        const newTracks = [...prev.tracks];
+        newTracks.splice(trackIndex + 1, 0, duplicate);
+        return { ...prev, tracks: newTracks };
+      });
+    },
+    [song]
+  );
+
+  // Move track to another pattern
+  const handleMoveToPattern = useCallback(
+    (trackIndex: number, targetPatternIndex: number) => {
+      if (!song) return;
+      const track = song.tracks[trackIndex];
+      if (!track) return;
+
+      setSong((prev) => {
+        if (!prev) return prev;
+        // Remove from current tracks
+        const newTracks = prev.tracks.filter((_, i) => i !== trackIndex);
+        // Add to target pattern
+        const newPatterns = prev.patterns.map((pat, i) => {
+          if (i === targetPatternIndex) {
+            return {
+              ...pat,
+              tracks: [...pat.tracks, { ...track, events: [...track.events] }],
+            };
+          }
+          if (i === activePatternIndex) {
+            return {
+              ...pat,
+              tracks: newTracks,
+            };
+          }
+          return pat;
+        });
+        return {
+          ...prev,
+          tracks: newTracks,
+          patterns: newPatterns,
+        };
+      });
+
+      // Adjust selected track index if needed
+      if (selectedTrackIndex >= (song.tracks.length - 1)) {
+        setSelectedTrackIndex(Math.max(0, song.tracks.length - 2));
+      }
+    },
+    [song, activePatternIndex, selectedTrackIndex]
   );
 
   // Get selected track info
@@ -389,11 +695,13 @@ export default function PlayerPage() {
                   song.arrangement.map((entry, idx) => (
                     <tr
                       key={idx}
-                      onClick={() => handlePatternChange(entry.patternIndex)}
+                      onClick={() => handleArrangementJump(idx)}
                       className={`cursor-pointer transition-colors ${
-                        entry.patternIndex === activePatternIndex
+                        idx === currentArrangementIndex
                           ? "bg-notator-highlight text-white"
-                          : "text-notator-text hover:bg-notator-surface-hover"
+                          : entry.patternIndex === activePatternIndex
+                            ? "bg-notator-surface-active text-notator-accent"
+                            : "text-notator-text hover:bg-notator-surface-hover"
                       }`}
                       id={`arrange-row-${idx}`}
                     >
@@ -502,6 +810,8 @@ export default function PlayerPage() {
               onToggleMute={handleToggleMute}
               onToggleSolo={handleToggleSolo}
               onSelectTrack={setSelectedTrackIndex}
+              onTrackContextMenu={handleTrackContextMenu}
+              onTrackDoubleClick={handleOpenEditor}
             />
           </div>
         </main>
@@ -690,6 +1000,59 @@ export default function PlayerPage() {
         <div className="border-t border-notator-red/30 bg-notator-red/10 px-4 py-2 text-sm text-notator-red">
           {error}
         </div>
+      )}
+
+      {/* Track Context Menu */}
+      {contextMenu && (
+        <TrackContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          trackIndex={contextMenu.trackIndex}
+          trackName={song.tracks[contextMenu.trackIndex]?.name || `Track ${contextMenu.trackIndex + 1}`}
+          isMuted={mutedTracks.has(contextMenu.trackIndex)}
+          isSoloed={soloedTracks.has(contextMenu.trackIndex)}
+          patterns={song.patterns.map((p, i) => ({ index: i, name: p.name || `Pattern ${i + 1}` }))}
+          activePatternIndex={activePatternIndex}
+          hasClipboard={trackClipboard !== null}
+          onEdit={() => handleOpenEditor(contextMenu.trackIndex)}
+          onExportMidi={() => handleExportTrackMidi(contextMenu.trackIndex)}
+          onToggleMute={() => handleToggleMute(contextMenu.trackIndex)}
+          onToggleSolo={() => handleToggleSolo(contextMenu.trackIndex)}
+          onCopy={() => handleCopyTrack(contextMenu.trackIndex)}
+          onCut={() => handleCutTrack(contextMenu.trackIndex)}
+          onPaste={() => handlePasteTrack(contextMenu.trackIndex)}
+          onDelete={() => handleDeleteTrack(contextMenu.trackIndex)}
+          onDuplicate={() => handleDuplicateTrack(contextMenu.trackIndex)}
+          onMoveToPattern={(patIdx) => handleMoveToPattern(contextMenu.trackIndex, patIdx)}
+          onClose={handleCloseContextMenu}
+        />
+      )}
+
+      {/* Piano Roll Editor */}
+      {editingTrackIndex !== null && song.tracks[editingTrackIndex] && (
+        <PianoRollEditor
+          track={song.tracks[editingTrackIndex]}
+          trackIndex={editingTrackIndex}
+          ticksPerBeat={song.ticksPerBeat}
+          ticksPerMeasure={song.ticksPerMeasure}
+          totalTicks={song.totalTicks}
+          currentTick={editorCurrentTick}
+          isPlaying={editorPlaybackState === 'playing'}
+          loopEnabled={editorLoopEnabled}
+          loopStart={editorLoopStart}
+          loopEnd={editorLoopEnd}
+          onSave={handleSaveEditor}
+          onClose={handleCloseEditor}
+          onPreviewNote={handlePreviewNote}
+          onSeek={handleEditorSeek}
+          onPlay={handleEditorPlay}
+          onPause={handleEditorPause}
+          onStop={handleEditorStop}
+          onToggleLoop={handleEditorToggleLoop}
+          onSetLoopRegion={handleEditorSetLoopRegion}
+          isSoloed={editorSoloed}
+          onToggleSolo={handleEditorToggleSolo}
+        />
       )}
     </div>
   );
