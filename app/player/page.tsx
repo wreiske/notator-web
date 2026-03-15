@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, type ChangeEvent } from "react";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { TransportBar } from "@/components/transport/TransportBar";
 import { TrackList } from "@/components/tracks/TrackList";
@@ -43,8 +43,9 @@ export default function PlayerPage() {
   const [activePatternIndex, setActivePatternIndex] = useState(0);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState(0);
 
-  // Engine ref
+  // Refs
   const engineRef = useRef<PlaybackEngine | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize engine
   useEffect(() => {
@@ -131,6 +132,29 @@ export default function PlayerPage() {
     [handleFileLoad]
   );
 
+  // File menu: trigger hidden file input
+  const handleLoadFileClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  // File menu: handle selected file
+  const handleFileInputChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (reader.result instanceof ArrayBuffer) {
+          handleFileLoad(reader.result, file.name);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+      // Reset so the same file can be re-selected
+      e.target.value = "";
+    },
+    [handleFileLoad]
+  );
+
   // Transport controls
   const handlePlay = useCallback(() => engineRef.current?.play(), []);
   const handlePause = useCallback(() => engineRef.current?.pause(), []);
@@ -211,6 +235,14 @@ export default function PlayerPage() {
   if (!song) {
     return (
       <div className="flex min-h-screen flex-col bg-notator-bg-deep">
+        {/* Hidden file input for File > Load menu item */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".son,.SON"
+          className="hidden"
+          onChange={handleFileInputChange}
+        />
         <TransportBar
           state={playbackState}
           currentTick={0}
@@ -221,6 +253,8 @@ export default function PlayerPage() {
           onPause={handlePause}
           onStop={handleStop}
           onTempoChange={handleTempoChange}
+          onLoadFileClick={handleLoadFileClick}
+          onDemoLoad={handleDemoLoad}
         />
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
           <div className="space-y-8">
@@ -272,6 +306,14 @@ export default function PlayerPage() {
   // ═══════════════════════════════════════════════════════════════
   return (
     <div className="flex min-h-screen flex-col bg-notator-bg-deep">
+      {/* Hidden file input for File > Load menu item */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".son,.SON"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
       {/* Transport Bar (top) */}
       <TransportBar
         state={playbackState}
@@ -283,6 +325,8 @@ export default function PlayerPage() {
         onPause={handlePause}
         onStop={handleStop}
         onTempoChange={handleTempoChange}
+        onLoadFileClick={handleLoadFileClick}
+        onDemoLoad={handleDemoLoad}
       />
 
       {/* 3-Panel body */}

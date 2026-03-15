@@ -1,7 +1,10 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import type { PlaybackState } from "@/lib/playback/engine";
 import { ticksToPosition } from "@/lib/son-parser/types";
+import { MenuBar, type MenuDefinition } from "@/components/ui/MenuBar";
+import { AboutDialog } from "@/components/ui/AboutDialog";
 
 interface TransportBarProps {
   state: PlaybackState;
@@ -13,7 +16,19 @@ interface TransportBarProps {
   onPause: () => void;
   onStop: () => void;
   onTempoChange: (bpm: number) => void;
+  /** Trigger native file picker for .SON loading */
+  onLoadFileClick?: () => void;
+  /** Load a demo .SON by path and name */
+  onDemoLoad?: (path: string, name: string) => void;
 }
+
+/** Demo .SON files for the File menu */
+const DEMO_FILES = [
+  { name: "EXAMPLE.SON", path: "/demos/EXAMPLE.SON" },
+  { name: "DRUMMAP.SON", path: "/demos/DRUMMAP.SON" },
+  { name: "POLYPHON.SON", path: "/demos/POLYPHON.SON" },
+  { name: "N_TUPLET.SON", path: "/demos/N_TUPLET.SON" },
+];
 
 /** Format a position as BAR:BEAT:TICK with padding */
 function formatPosition(tick: number): string {
@@ -34,21 +49,107 @@ export function TransportBar({
   onPause,
   onStop,
   onTempoChange,
+  onLoadFileClick,
+  onDemoLoad,
 }: TransportBarProps) {
+  const [aboutOpen, setAboutOpen] = useState(false);
+
+  const menus: MenuDefinition[] = useMemo(
+    () => [
+      {
+        label: "Desk",
+        items: [
+          {
+            label: "About Notator Web…",
+            onClick: () => setAboutOpen(true),
+          },
+        ],
+      },
+      {
+        label: "File",
+        items: [
+          {
+            label: "Load .SON File…",
+            onClick: onLoadFileClick,
+          },
+          { label: "", separator: true },
+          ...DEMO_FILES.map((demo) => ({
+            label: `Demo: ${demo.name}`,
+            onClick: () => onDemoLoad?.(demo.path, demo.name),
+          })),
+        ],
+      },
+      {
+        label: "Functions",
+        items: [
+          { label: "Copy Pattern", disabled: true },
+          { label: "Clear Pattern", disabled: true },
+        ],
+      },
+      {
+        label: "Quantize",
+        items: [
+          { label: "1/4 Note", disabled: true },
+          { label: "1/8 Note", disabled: true },
+          { label: "1/16 Note", disabled: true },
+          { label: "1/32 Note", disabled: true },
+        ],
+      },
+      {
+        label: "MIDI",
+        className: "!text-notator-text-muted font-bold",
+        items: [
+          { label: "MIDI Thru", disabled: true },
+          { label: "MIDI Sync", disabled: true },
+          { label: "", separator: true },
+          { label: "All Notes Off", disabled: true },
+        ],
+      },
+      {
+        label: "Flags",
+        items: [
+          { label: "Loop", disabled: true },
+          { label: "Auto-Advance", disabled: true },
+        ],
+      },
+      {
+        label: "Options",
+        items: [
+          { label: "GM Synth", disabled: true },
+          { label: "Web MIDI Output", disabled: true },
+        ],
+      },
+      {
+        label: "Help",
+        items: [
+          {
+            label: "GitHub Repository ↗",
+            href: "https://github.com/wreiske/notator-web",
+          },
+          {
+            label: "About .SON Format ↗",
+            href: "https://github.com/wreiske/notator-web#-son-file-format",
+          },
+          { label: "", separator: true },
+          {
+            label: "About Notator Web…",
+            onClick: () => setAboutOpen(true),
+          },
+        ],
+      },
+    ],
+    [onLoadFileClick, onDemoLoad]
+  );
+
   return (
     <div className="select-none border-b-2 border-notator-border-bright bg-notator-panel font-mono text-notator-text">
-      {/* Top: Notator branding bar */}
-      <div className="flex items-center justify-between border-b border-notator-border px-3 py-1 text-[11px]">
-        <div className="flex items-center gap-4">
-          <span className="text-notator-text-dim">Desk</span>
-          <span className="text-notator-text-dim">File</span>
-          <span className="text-notator-text-dim">Functions</span>
-          <span className="text-notator-text-dim">Quantize</span>
-          <span className="text-notator-text-muted">MIDI</span>
-          <span className="text-notator-text-dim">Flags</span>
-          <span className="text-notator-text-dim">Options</span>
-        </div>
-        <div className="flex items-center gap-2">
+      {/* About dialog */}
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+
+      {/* Top: menu bar + branding */}
+      <div className="flex items-center justify-between border-b border-notator-border px-1 py-0 text-[11px]">
+        <MenuBar menus={menus} />
+        <div className="flex items-center gap-2 pr-2">
           <span className="tracking-[0.3em] text-notator-text-muted">
             N O T A T O R
           </span>
