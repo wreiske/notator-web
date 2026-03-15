@@ -23,6 +23,8 @@ interface TransportBarProps {
   onLoadFileClick?: () => void;
   /** Load a demo .SON by path and name */
   onDemoLoad?: (path: string, name: string) => void;
+  /** Export current song as Standard MIDI File */
+  onExportMidi?: () => void;
 }
 
 /** Demo .SON files for the File menu */
@@ -57,6 +59,7 @@ export function TransportBar({
   onToggleLoop,
   onLoadFileClick,
   onDemoLoad,
+  onExportMidi,
 }: TransportBarProps) {
   const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -81,6 +84,13 @@ export function TransportBar({
           {
             label: "Load .SON File…",
             onClick: onLoadFileClick,
+          },
+          { label: "", separator: true },
+          {
+            label: "Export as MIDI…",
+            onClick: onExportMidi,
+            disabled: !onExportMidi,
+            suffix: "⌘E",
           },
           { label: "", separator: true },
           ...DEMO_FILES.map((demo) => ({
@@ -151,7 +161,7 @@ export function TransportBar({
         ],
       },
     ],
-    [onLoadFileClick, onDemoLoad, loopEnabled, onToggleLoop]
+    [onLoadFileClick, onDemoLoad, onExportMidi, loopEnabled, onToggleLoop]
   );
 
   return (

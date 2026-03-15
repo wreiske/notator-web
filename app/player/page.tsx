@@ -9,6 +9,7 @@ import { parseSonFile } from "@/lib/son-parser";
 import type { SonFile, SongData, Track } from "@/lib/son-parser/types";
 import { PlaybackEngine } from "@/lib/playback/engine";
 import type { PlaybackState } from "@/lib/playback/engine";
+import { exportSongToMidi, downloadMidi } from "@/lib/midi/midi-file-export";
 
 /** Demo .SON files bundled from the /st directory */
 const DEMO_FILES = [
@@ -176,6 +177,14 @@ export default function PlayerPage() {
     });
   }, []);
 
+  // Export as MIDI
+  const handleExportMidi = useCallback(() => {
+    if (!song) return;
+    const midiData = exportSongToMidi(song, songName || undefined);
+    const filename = (songName || "export").replace(/\s+/g, "_") + ".mid";
+    downloadMidi(midiData, filename);
+  }, [song, songName]);
+
   // Switch active pattern
   const handlePatternChange = useCallback(
     (patternIndex: number) => {
@@ -270,6 +279,7 @@ export default function PlayerPage() {
           onToggleLoop={handleToggleLoop}
           onLoadFileClick={handleLoadFileClick}
           onDemoLoad={handleDemoLoad}
+          onExportMidi={undefined}
         />
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
           <div className="space-y-8">
@@ -345,6 +355,7 @@ export default function PlayerPage() {
         onToggleLoop={handleToggleLoop}
         onLoadFileClick={handleLoadFileClick}
         onDemoLoad={handleDemoLoad}
+        onExportMidi={handleExportMidi}
       />
 
       {/* 3-Panel body */}
