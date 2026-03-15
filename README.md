@@ -7,7 +7,7 @@ A browser-based player and parser for **Notator SL 3.21** `.SON` files, built wi
 ## ✨ Features
 
 - **Complete `.SON` parser** — all 14+ event types (confirmed via Ghidra decompilation of `NOTATOR.PRG`)
-- **General MIDI playback** — realistic instrument sounds via [WebAudioFont](https://github.com/nicepkg/webaudiofont) (FluidR3 GM SoundFont)
+- **General MIDI playback** — realistic instrument sounds via [WebAudioFont](https://github.com/surikov/webaudiofont) (FluidR3 GM SoundFont)
 - **Full GM drum kit** on channel 10 with real kick, snare, hi-hat, cymbal samples
 - **Program Change** support — songs that specify instruments switch sounds correctly
 - **Arrangement playback** — automatic pattern sequencing (auto-advance to next pattern)
@@ -160,6 +160,6 @@ MIT
 
 - **Notator SL** — C-Lab / eMagic (Gerhard Lengeling)
 - **son2midi** — [Simon Cozens](https://github.com/simoncozens/son2midi) for initial .SON reverse engineering
-- **WebAudioFont** — [Sergey Surikov](https://github.com/nicepkg/webaudiofont) for GM SoundFont samples
+- **WebAudioFont** — [Sergey Surikov](https://github.com/surikov/webaudiofont) for GM SoundFont samples
 - **RetroGhidra** — [Andrew Dunstan](https://github.com/hippietrail/RetroGhidra) for the Atari ST Ghidra loader
 - **Atari ST** community for preserving these files
