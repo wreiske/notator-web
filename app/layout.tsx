@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://notator.online"),
   title: "Notator Web — Atari ST MIDI Sequencer in the Browser",
   description:
     "Play and explore Notator SL .SON files directly in your browser using Web MIDI and Web Audio. A modern tribute to the legendary Atari ST sequencer.",
@@ -27,6 +28,20 @@ export const metadata: Metadata = {
     "music",
     "retro",
   ],
+  openGraph: {
+    title: "Notator Web — Atari ST MIDI Sequencer in the Browser",
+    description:
+      "Play and explore Notator SL .SON files directly in your browser using Web MIDI and Web Audio.",
+    url: "https://notator.online",
+    siteName: "Notator Web",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Notator Web — Atari ST MIDI Sequencer in the Browser",
+    description:
+      "Play and explore Notator SL .SON files directly in your browser.",
+  },
 };
 
 export default function RootLayout({

@@ -131,6 +131,15 @@ export function AboutDialog({ open, onClose }: AboutDialogProps) {
           {/* Links */}
           <div className="flex items-center justify-center gap-4 text-[10px]">
             <a
+              href="https://notator.online"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-notator-accent hover:text-notator-accent-hover transition-colors"
+            >
+              notator.online ↗
+            </a>
+            <span className="text-notator-border">│</span>
+            <a
               href="https://github.com/wreiske/notator-web"
               target="_blank"
               rel="noopener noreferrer"

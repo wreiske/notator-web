@@ -267,6 +267,7 @@ export function PianoRollEditor({
   const containerRef = useRef<HTMLDivElement>(null);
   const velocityCanvasRef = useRef<HTMLCanvasElement>(null);
   const rulerCanvasRef = useRef<HTMLCanvasElement>(null);
+  const hScrollRef = useRef<HTMLDivElement>(null);
   const lastPreviewNoteRef = useRef<number>(-1);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -429,6 +430,24 @@ export function PianoRollEditor({
     }
 
     // ─── Note rectangles ──────────────────────────────────────────
+    // First pass: draw row highlights for active notes
+    if (isPlaying && currentTick > 0) {
+      for (const n of notes) {
+        const isActive = currentTick >= n.startTick && currentTick < n.endTick;
+        if (isActive) {
+          const y = noteToY(n.note);
+          ctx.fillStyle = "rgba(0, 220, 255, 0.06)";
+          ctx.fillRect(
+            GUTTER_WIDTH,
+            y,
+            canvasWidth - GUTTER_WIDTH,
+            NOTE_HEIGHT,
+          );
+        }
+      }
+    }
+
+    // Second pass: draw note bodies
     for (const n of notes) {
       const y = noteToY(n.note) + 1;
       const x = tickToX(n.startTick);
@@ -437,6 +456,8 @@ export function PianoRollEditor({
         ((n.endTick - n.startTick) / ticksPerBeat) * PIXELS_PER_BEAT,
       );
       const isSelected = selectedIds.has(n.id);
+      const isActive =
+        isPlaying && currentTick >= n.startTick && currentTick < n.endTick;
 
       // Color based on velocity
       const velRatio = n.velocity / 127;
@@ -444,7 +465,14 @@ export function PianoRollEditor({
       const g = Math.round(40 + velRatio * 60);
       const b_val = Math.round(40 + velRatio * 60);
 
-      if (isSelected) {
+      if (isActive) {
+        // ✦ Active/playing note — bright neon glow
+        ctx.shadowColor = "rgba(0, 220, 255, 0.8)";
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = `rgba(0, 230, 255, ${0.85 + velRatio * 0.15})`;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+      } else if (isSelected) {
         ctx.fillStyle = "#ffbb44dd";
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 1.5;
@@ -461,15 +489,21 @@ export function PianoRollEditor({
       ctx.fill();
       ctx.stroke();
 
+      // Reset shadow after active note glow
+      if (isActive) {
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+      }
+
       // Note name inside (if wide enough)
       if (w > 28) {
-        ctx.fillStyle = isSelected ? "#000" : "#fff";
+        ctx.fillStyle = isActive ? "#000" : isSelected ? "#000" : "#fff";
         ctx.font = "bold 8px 'IBM Plex Mono', monospace";
         ctx.fillText(noteName(n.note), x + 3, y + NOTE_HEIGHT - 5);
       }
 
       // Resize handle (right edge)
-      ctx.fillStyle = isSelected ? "#fff8" : "#fff3";
+      ctx.fillStyle = isActive ? "#fff8" : isSelected ? "#fff8" : "#fff3";
       ctx.fillRect(x + w - 4, y + 2, 3, NOTE_HEIGHT - 6);
 
       ctx.lineWidth = 1;
@@ -491,6 +525,20 @@ export function PianoRollEditor({
       ctx.strokeRect(mx, my, mw, mh);
       ctx.setLineDash([]);
     }
+
+    // ─── Playback cursor line through main grid ───────────────────
+    if (currentTick > 0) {
+      const cx = tickToX(currentTick);
+      if (cx >= GUTTER_WIDTH && cx <= canvasWidth) {
+        ctx.strokeStyle = "#ff556688";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, 0);
+        ctx.lineTo(cx, canvasHeight);
+        ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+    }
   }, [
     notes,
     selectedIds,
@@ -503,6 +551,8 @@ export function PianoRollEditor({
     tickToX,
     noteToY,
     marquee,
+    currentTick,
+    isPlaying,
   ]);
 
   // ─── Velocity lane drawing ────────────────────────────────────────
@@ -543,7 +593,21 @@ export function PianoRollEditor({
       ctx.fillStyle = isSelected ? "#ffbb44cc" : "#4488ffaa";
       ctx.fillRect(x, VELOCITY_HEIGHT - barH - 2, 4, barH);
     }
-  }, [notes, selectedIds, canvasWidth, tickToX]);
+
+    // Playback cursor line through velocity lane
+    if (currentTick > 0) {
+      const cx = tickToX(currentTick);
+      if (cx >= GUTTER_WIDTH && cx <= canvasWidth) {
+        ctx.strokeStyle = "#ff556688";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, 0);
+        ctx.lineTo(cx, VELOCITY_HEIGHT);
+        ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+    }
+  }, [notes, selectedIds, canvasWidth, tickToX, currentTick]);
 
   // ─── Note preview ─────────────────────────────────────────────────
   const previewNote = useCallback(
@@ -699,6 +763,23 @@ export function PianoRollEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-follow playback cursor during playback
+  useEffect(() => {
+    if (!isPlaying || currentTick <= 0) return;
+    const scrollContainer = hScrollRef.current;
+    if (!scrollContainer) return;
+
+    const cx = tickToX(currentTick);
+    const viewLeft = scrollContainer.scrollLeft;
+    const viewRight = viewLeft + scrollContainer.clientWidth;
+    const margin = scrollContainer.clientWidth * 0.15;
+
+    // If cursor is near or past the right edge, scroll to keep it in view
+    if (cx > viewRight - margin || cx < viewLeft + GUTTER_WIDTH) {
+      scrollContainer.scrollLeft = cx - scrollContainer.clientWidth * 0.3;
+    }
+  }, [isPlaying, currentTick, tickToX]);
 
   // ─── Mouse interactions ───────────────────────────────────────────
   const getCanvasCoords = useCallback(
@@ -1574,47 +1655,58 @@ export function PianoRollEditor({
         </div>
 
         {/* ─── CANVAS AREA ──────────────────────────────────────── */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Ruler / scrubber */}
+        <div
+          ref={hScrollRef}
+          className="flex flex-1 flex-col overflow-x-auto overflow-y-hidden"
+        >
+          {/* Inner wrapper — sets the full scrollable width for all 3 areas */}
           <div
-            className="flex-shrink-0 overflow-x-auto overflow-y-hidden"
-            style={{ height: RULER_HEIGHT }}
-          >
-            <canvas
-              ref={rulerCanvasRef}
-              onMouseDown={handleRulerMouseDown}
-              style={{ cursor: "pointer" }}
-            />
-          </div>
-
-          {/* Main grid */}
-          <div
-            ref={containerRef}
-            className="flex-1 overflow-auto"
             style={{
-              cursor:
-                tool === "draw"
-                  ? "crosshair"
-                  : tool === "erase"
-                    ? "not-allowed"
-                    : "default",
+              width: canvasWidth,
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+              flex: 1,
             }}
           >
-            <canvas
-              ref={canvasRef}
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseLeave={handleCanvasMouseUp}
-            />
-          </div>
+            {/* Ruler / scrubber */}
+            <div className="flex-shrink-0" style={{ height: RULER_HEIGHT }}>
+              <canvas
+                ref={rulerCanvasRef}
+                onMouseDown={handleRulerMouseDown}
+                style={{ cursor: "pointer" }}
+              />
+            </div>
 
-          {/* Velocity lane */}
-          <div
-            className="border-t border-notator-border overflow-x-auto overflow-y-hidden flex-shrink-0"
-            style={{ height: VELOCITY_HEIGHT }}
-          >
-            <canvas ref={velocityCanvasRef} />
+            {/* Main grid */}
+            <div
+              ref={containerRef}
+              className="flex-1 overflow-y-auto overflow-x-hidden"
+              style={{
+                cursor:
+                  tool === "draw"
+                    ? "crosshair"
+                    : tool === "erase"
+                      ? "not-allowed"
+                      : "default",
+              }}
+            >
+              <canvas
+                ref={canvasRef}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={handleCanvasMouseUp}
+              />
+            </div>
+
+            {/* Velocity lane */}
+            <div
+              className="border-t border-notator-border flex-shrink-0"
+              style={{ height: VELOCITY_HEIGHT }}
+            >
+              <canvas ref={velocityCanvasRef} />
+            </div>
           </div>
         </div>
       </div>

@@ -2,6 +2,8 @@
 
 > The Atari ST Sequencer, in your browser
 
+**🌐 Live Demo: [notator.online](https://notator.online)**
+
 A browser-based player and parser for **Notator SL 3.21** `.SON` files, built with modern Web Audio and Web MIDI APIs. A tribute to the legendary C-Lab/eMagic Notator sequencer for the Atari ST.
 
 ## ✨ Features
@@ -20,13 +22,13 @@ A browser-based player and parser for **Notator SL 3.21** `.SON` files, built wi
 
 ## 🛠 Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | **Next.js 16** (App Router, static export) |
-| UI | **React 19** + **Tailwind CSS 4** |
-| Audio | **WebAudioFont** (GM SoundFont) + **Web MIDI API** |
-| Parser | TypeScript — complete round-trip `.SON` format |
-| Hosting | **Cloudflare Pages** (static) |
+| Layer     | Technology                                         |
+| --------- | -------------------------------------------------- |
+| Framework | **Next.js 16** (App Router, static export)         |
+| UI        | **React 19** + **Tailwind CSS 4**                  |
+| Audio     | **WebAudioFont** (GM SoundFont) + **Web MIDI API** |
+| Parser    | TypeScript — complete round-trip `.SON` format     |
+| Hosting   | **Cloudflare Pages** (static)                      |
 
 ## 📁 Project Structure
 
@@ -75,11 +77,11 @@ npm run build
 npx serve out
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the app.
+Open [http://localhost:3000](http://localhost:3000) to see the app, or visit the live version at [notator.online](https://notator.online).
 
 ## 🎹 Usage
 
-1. Open the player at `/player`
+1. Open the player at [notator.online/player](https://notator.online/player) (or `/player` locally)
 2. Drag & drop a `.SON` file or click one of the demo files
 3. Press **Start** — audio plays through:
    - **WebAudioFont GM synth** — realistic instrument sounds (default)
@@ -94,30 +96,30 @@ The `.SON` format is a proprietary binary format used by Notator SL/Creator on t
 
 ### File Layout
 
-| Region | Offset | Description |
-|--------|--------|-------------|
-| Header | `0x0000` | Magic, tempo, ticks/measure, instrument names |
+| Region         | Offset   | Description                                       |
+| -------------- | -------- | ------------------------------------------------- |
+| Header         | `0x0000` | Magic, tempo, ticks/measure, instrument names     |
 | Channel Config | `0x0330` | MIDI channels, programs, volumes, pans (16 slots) |
-| Arrangement | `0x0370` | Pattern sequencing data |
-| Track Data | `0x5AC8` | Boundary-separated track slots |
+| Arrangement    | `0x0370` | Pattern sequencing data                           |
+| Track Data     | `0x5AC8` | Boundary-separated track slots                    |
 
 ### Event Types (6 bytes each)
 
-| Status (& 0xF0) | Type | Description |
-|-----------------|------|-------------|
-| `0x00` | Meta | Pattern end markers, system events |
-| `0x30` | Bar Marker | Bar/pattern boundary markers |
-| `0x40` | Track Setup | Track initialization data |
-| `0x60` | Track Config | Filter flags, channel/port assignment |
-| `0x70` | Notation | Display-only notation data |
-| `0x80` | Note Off | MIDI note release |
-| `0x90` | Note On | MIDI note with velocity |
-| `0xA0` | Aftertouch | Polyphonic key pressure |
-| `0xB0` | Control Change | CC messages (sustain, modulation, etc.) |
-| `0xC0` | Program Change | GM instrument selection |
-| `0xD0` | Channel Pressure | Monophonic aftertouch |
-| `0xE0` | Pitch Wheel | Pitch bend data |
-| `0xF0` | SysEx | System Exclusive (multi-record chains) |
+| Status (& 0xF0) | Type             | Description                             |
+| --------------- | ---------------- | --------------------------------------- |
+| `0x00`          | Meta             | Pattern end markers, system events      |
+| `0x30`          | Bar Marker       | Bar/pattern boundary markers            |
+| `0x40`          | Track Setup      | Track initialization data               |
+| `0x60`          | Track Config     | Filter flags, channel/port assignment   |
+| `0x70`          | Notation         | Display-only notation data              |
+| `0x80`          | Note Off         | MIDI note release                       |
+| `0x90`          | Note On          | MIDI note with velocity                 |
+| `0xA0`          | Aftertouch       | Polyphonic key pressure                 |
+| `0xB0`          | Control Change   | CC messages (sustain, modulation, etc.) |
+| `0xC0`          | Program Change   | GM instrument selection                 |
+| `0xD0`          | Channel Pressure | Monophonic aftertouch                   |
+| `0xE0`          | Pitch Wheel      | Pitch bend data                         |
+| `0xF0`          | SysEx            | System Exclusive (multi-record chains)  |
 
 ### Key Details
 
