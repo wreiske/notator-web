@@ -23,7 +23,7 @@ export function FileDropZone({ onFileLoad }: FileDropZoneProps) {
       };
       reader.readAsArrayBuffer(file);
     },
-    [onFileLoad]
+    [onFileLoad],
   );
 
   return (

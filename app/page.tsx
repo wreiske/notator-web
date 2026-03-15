@@ -24,9 +24,7 @@ export default function HomePage() {
           {/* Tagline */}
           <h2 className="mb-4 text-4xl font-bold tracking-tight text-notator-text sm:text-5xl">
             The Atari ST Sequencer,{" "}
-            <span className="text-notator-accent">
-              in your browser
-            </span>
+            <span className="text-notator-accent">in your browser</span>
           </h2>
 
           <p className="mx-auto mb-8 max-w-lg text-base text-notator-text-muted">
@@ -44,7 +42,12 @@ export default function HomePage() {
               className="notator-btn inline-flex h-12 items-center justify-center gap-2 rounded border-notator-accent bg-notator-accent px-8 text-base text-white transition-all hover:bg-notator-accent-hover hover:scale-105 active:scale-95"
               id="cta-open-player"
             >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 18 18"
+                fill="currentColor"
+              >
                 <path d="M5 3.5L14.5 9L5 14.5V3.5Z" />
               </svg>
               START

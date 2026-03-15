@@ -50,7 +50,7 @@ export function noteOn(
   channel: number,
   note: number,
   velocity: number,
-  timestamp?: number
+  timestamp?: number,
 ): void {
   const status = 0x90 | (channel & 0x0f);
   output.send([status, note & 0x7f, velocity & 0x7f], timestamp);
@@ -61,7 +61,7 @@ export function noteOff(
   output: MidiOutput,
   channel: number,
   note: number,
-  timestamp?: number
+  timestamp?: number,
 ): void {
   const status = 0x80 | (channel & 0x0f);
   output.send([status, note & 0x7f, 0], timestamp);
@@ -72,7 +72,7 @@ export function pitchWheel(
   output: MidiOutput,
   channel: number,
   value: number,
-  timestamp?: number
+  timestamp?: number,
 ): void {
   const status = 0xe0 | (channel & 0x0f);
   // Convert -8192..8191 range to 14-bit value (0..16383)
@@ -86,7 +86,7 @@ export function pitchWheel(
 export function allNotesOff(
   output: MidiOutput,
   channel: number,
-  timestamp?: number
+  timestamp?: number,
 ): void {
   const status = 0xb0 | (channel & 0x0f);
   output.send([status, 123, 0], timestamp); // CC 123 = All Notes Off

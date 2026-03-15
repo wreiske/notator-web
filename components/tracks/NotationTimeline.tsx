@@ -44,12 +44,25 @@ interface NotationTimelineProps {
 }
 
 /** Piano key labels for the left gutter */
-const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const NOTE_NAMES = [
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+];
 function noteName(n: number): string {
   return `${NOTE_NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
 }
 function isBlackKey(n: number): boolean {
-  return [1,3,6,8,10].includes(n % 12);
+  return [1, 3, 6, 8, 10].includes(n % 12);
 }
 
 export function NotationTimeline({
@@ -85,7 +98,10 @@ export function NotationTimeline({
 
       for (const event of track.events) {
         if (event.type === "note_on") {
-          pending.set(event.note, { velocity: event.velocity, tick: event.tick });
+          pending.set(event.note, {
+            velocity: event.velocity,
+            tick: event.tick,
+          });
         } else if (event.type === "note_off") {
           const start = pending.get(event.note);
           if (start) {
@@ -134,25 +150,36 @@ export function NotationTimeline({
   }, [tracks, selectedTrackIndex, showAllTracks, totalTicks]);
 
   // ─── Canvas dimensions ───────────────────────────────────────────
-  const GUTTER_WIDTH = 44;    // Left note labels
-  const NOTE_HEIGHT = 10;     // Pixel height per MIDI note row
+  const GUTTER_WIDTH = 44; // Left note labels
+  const NOTE_HEIGHT = 10; // Pixel height per MIDI note row
   const PIXELS_PER_BEAT = 24; // Horizontal scale
 
   // Snap the display start to one measure before the first note
-  const displayStartTick = Math.max(0, Math.floor(minTick / ticksPerMeasure) * ticksPerMeasure - ticksPerMeasure);
+  const displayStartTick = Math.max(
+    0,
+    Math.floor(minTick / ticksPerMeasure) * ticksPerMeasure - ticksPerMeasure,
+  );
   // Display ends one measure after the last note (or totalTicks)
-  const displayEndTick = Math.min(totalTicks, Math.ceil(maxTick / ticksPerMeasure) * ticksPerMeasure + ticksPerMeasure);
+  const displayEndTick = Math.min(
+    totalTicks,
+    Math.ceil(maxTick / ticksPerMeasure) * ticksPerMeasure + ticksPerMeasure,
+  );
   const displayTicks = displayEndTick - displayStartTick;
 
   const noteRange = maxNote - minNote + 1;
   const canvasHeight = Math.max(120, noteRange * NOTE_HEIGHT + 2);
   const displayBeats = displayTicks / ticksPerBeat;
-  const canvasWidth = Math.max(600, GUTTER_WIDTH + displayBeats * PIXELS_PER_BEAT + 20);
+  const canvasWidth = Math.max(
+    600,
+    GUTTER_WIDTH + displayBeats * PIXELS_PER_BEAT + 20,
+  );
 
   /** Convert a tick position to an X pixel coordinate */
   const tickToX = useCallback(
-    (tick: number) => GUTTER_WIDTH + ((tick - displayStartTick) / ticksPerBeat) * PIXELS_PER_BEAT,
-    [displayStartTick, ticksPerBeat]
+    (tick: number) =>
+      GUTTER_WIDTH +
+      ((tick - displayStartTick) / ticksPerBeat) * PIXELS_PER_BEAT,
+    [displayStartTick, ticksPerBeat],
   );
 
   // Auto-scroll during playback
@@ -248,10 +275,14 @@ export function NotationTimeline({
     for (const rn of resolvedNotes) {
       const y = (maxNote - rn.note) * NOTE_HEIGHT + 1;
       const x = tickToX(rn.startTick);
-      const w = Math.max(2, ((rn.endTick - rn.startTick) / ticksPerBeat) * PIXELS_PER_BEAT);
+      const w = Math.max(
+        2,
+        ((rn.endTick - rn.startTick) / ticksPerBeat) * PIXELS_PER_BEAT,
+      );
 
       const color = TRACK_COLORS[rn.trackIndex % TRACK_COLORS.length];
-      const alpha = !showAllTracks || rn.trackIndex === selectedTrackIndex ? "cc" : "55";
+      const alpha =
+        !showAllTracks || rn.trackIndex === selectedTrackIndex ? "cc" : "55";
 
       ctx.fillStyle = color + alpha;
       ctx.fillRect(x, y, w, NOTE_HEIGHT - 2);
@@ -274,10 +305,26 @@ export function NotationTimeline({
         ctx.lineWidth = 1;
       }
     }
-  }, [resolvedNotes, minNote, maxNote, canvasWidth, canvasHeight, ticksPerMeasure, ticksPerBeat, currentTick, showAllTracks, selectedTrackIndex, displayStartTick, displayEndTick, tickToX]);
+  }, [
+    resolvedNotes,
+    minNote,
+    maxNote,
+    canvasWidth,
+    canvasHeight,
+    ticksPerMeasure,
+    ticksPerBeat,
+    currentTick,
+    showAllTracks,
+    selectedTrackIndex,
+    displayStartTick,
+    displayEndTick,
+    tickToX,
+  ]);
 
   // Redraw on changes
-  useEffect(() => { draw(); }, [draw]);
+  useEffect(() => {
+    draw();
+  }, [draw]);
 
   // Compute display bar range for the toolbar
   const displayStartBar = Math.floor(displayStartTick / ticksPerMeasure) + 1;
@@ -334,7 +381,9 @@ export function NotationTimeline({
               >
                 <span
                   className="inline-block h-1.5 w-1.5 rounded-sm"
-                  style={{ backgroundColor: TRACK_COLORS[i % TRACK_COLORS.length] }}
+                  style={{
+                    backgroundColor: TRACK_COLORS[i % TRACK_COLORS.length],
+                  }}
                 />
                 {t.name || i + 1}
               </span>

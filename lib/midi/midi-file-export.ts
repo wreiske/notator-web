@@ -33,7 +33,7 @@ import type { SongData, TrackEvent } from "@/lib/son-parser/types";
  */
 export function exportSongToMidi(
   song: SongData,
-  songName?: string
+  songName?: string,
 ): Uint8Array {
   const ppqn = song.ticksPerBeat || 192;
   const trackChunks: Uint8Array[] = [];
@@ -46,15 +46,13 @@ export function exportSongToMidi(
     // Flatten the arrangement into merged tracks by channel
     const mergedTracks = flattenArrangement(song);
     for (const mt of mergedTracks) {
-      trackChunks.push(
-        buildMidiTrack(mt.events, mt.channel, mt.name, song)
-      );
+      trackChunks.push(buildMidiTrack(mt.events, mt.channel, mt.name, song));
     }
   } else {
     // ── Fallback: single pattern export ───────────────────────────
     for (const track of song.tracks) {
       trackChunks.push(
-        buildMidiTrack(track.events, track.channel, track.name, song)
+        buildMidiTrack(track.events, track.channel, track.name, song),
       );
     }
   }
@@ -74,7 +72,7 @@ export function exportSongToMidi(
 export function exportTrackToMidi(
   song: SongData,
   trackIndex: number,
-  songName?: string
+  songName?: string,
 ): Uint8Array {
   const track = song.tracks[trackIndex];
   if (!track) throw new Error(`Track ${trackIndex} not found`);
@@ -87,7 +85,9 @@ export function exportTrackToMidi(
     : track.name || `Track ${trackIndex + 1}`;
 
   trackChunks.push(buildConductorTrack(song, label));
-  trackChunks.push(buildMidiTrack(track.events, track.channel, track.name, song));
+  trackChunks.push(
+    buildMidiTrack(track.events, track.channel, track.name, song),
+  );
 
   return buildSmfFile(ppqn, trackChunks);
 }
@@ -98,7 +98,7 @@ export function exportTrackToMidi(
  * pattern's events at the correct tick offset.
  */
 function flattenArrangement(
-  song: SongData
+  song: SongData,
 ): { events: TrackEvent[]; channel: number; name: string }[] {
   const ticksPerMeasure = song.ticksPerMeasure || 768;
 
@@ -196,7 +196,7 @@ function buildConductorTrack(song: SongData, songName?: string): Uint8Array {
   events.push(
     (microsecondsPerBeat >> 16) & 0xff,
     (microsecondsPerBeat >> 8) & 0xff,
-    microsecondsPerBeat & 0xff
+    microsecondsPerBeat & 0xff,
   );
 
   // Time signature meta-event (FF 58 04 nn dd cc bb)
@@ -226,7 +226,7 @@ function buildMidiTrack(
   trackEvents: TrackEvent[],
   channel: number,
   trackName: string,
-  song: SongData
+  song: SongData,
 ): Uint8Array {
   const events: number[] = [];
   const ch = channel & 0x0f;
@@ -282,11 +282,7 @@ function buildMidiTrack(
 
       case "control_change":
         events.push(...vlq(delta));
-        events.push(
-          0xb0 | ch,
-          event.controller & 0x7f,
-          event.value & 0x7f
-        );
+        events.push(0xb0 | ch, event.controller & 0x7f, event.value & 0x7f);
         break;
 
       case "program_change":
@@ -301,11 +297,7 @@ function buildMidiTrack(
 
       case "aftertouch":
         events.push(...vlq(delta));
-        events.push(
-          0xa0 | ch,
-          event.note & 0x7f,
-          event.pressure & 0x7f
-        );
+        events.push(0xa0 | ch, event.note & 0x7f, event.pressure & 0x7f);
         break;
 
       case "pitch_wheel": {

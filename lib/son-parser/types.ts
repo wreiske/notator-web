@@ -406,7 +406,7 @@ export interface SongPosition {
 export function ticksToPosition(
   totalTicks: number,
   ticksPerMeasure: number = 768,
-  ticksPerBeat: number = 192
+  ticksPerBeat: number = 192,
 ): SongPosition {
   const bar = Math.floor(totalTicks / ticksPerMeasure);
   const remaining = totalTicks % ticksPerMeasure;

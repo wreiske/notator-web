@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, type ChangeEvent } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  type ChangeEvent,
+} from "react";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { TransportBar } from "@/components/transport/TransportBar";
 import { TrackList } from "@/components/tracks/TrackList";
@@ -8,13 +14,24 @@ import { TrackContextMenu } from "@/components/tracks/TrackContextMenu";
 import { PianoRollEditor } from "@/components/tracks/PianoRollEditor";
 import { NotationTimeline } from "@/components/tracks/NotationTimeline";
 import { parseSonFile } from "@/lib/son-parser";
-import type { SonFile, SongData, Track, TrackEvent as SonTrackEvent } from "@/lib/son-parser/types";
+import type {
+  SonFile,
+  SongData,
+  Track,
+  TrackEvent as SonTrackEvent,
+} from "@/lib/son-parser/types";
 import { PlaybackEngine } from "@/lib/playback/engine";
 import type { PlaybackState } from "@/lib/playback/engine";
-import { exportSongToMidi, exportTrackToMidi, downloadMidi } from "@/lib/midi/midi-file-export";
+import {
+  exportSongToMidi,
+  exportTrackToMidi,
+  downloadMidi,
+} from "@/lib/midi/midi-file-export";
 
 /** Demo .SON files bundled from the /st directory */
 const DEMO_FILES = [
+  { name: "ALEXA'S.SON", path: "/demos/ALEXA'S.SON", desc: "Alexa's song" },
+  { name: "AUTOLOAD.SON", path: "/demos/AUTOLOAD.SON", desc: "Autoload" },
   { name: "EXAMPLE.SON", path: "/demos/EXAMPLE.SON", desc: "Tutorial" },
   { name: "DRUMMAP.SON", path: "/demos/DRUMMAP.SON", desc: "Drum map" },
   { name: "POLYPHON.SON", path: "/demos/POLYPHON.SON", desc: "Polyphonic" },
@@ -23,7 +40,20 @@ const DEMO_FILES = [
 
 /** Map MIDI note number to name */
 function midiNoteName(note: number): string {
-  const names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  const names = [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B",
+  ];
   return `${names[note % 12]}${Math.floor(note / 12) - 1}`;
 }
 
@@ -43,7 +73,9 @@ export default function PlayerPage() {
   // Track state
   const [mutedTracks, setMutedTracks] = useState<Set<number>>(new Set());
   const [soloedTracks, setSoloedTracks] = useState<Set<number>>(new Set());
-  const [activeTrackIndices, setActiveTrackIndices] = useState<Set<number>>(new Set());
+  const [activeTrackIndices, setActiveTrackIndices] = useState<Set<number>>(
+    new Set(),
+  );
   const [activePatternIndex, setActivePatternIndex] = useState(0);
   const [currentArrangementIndex, setCurrentArrangementIndex] = useState(0);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState(0);
@@ -59,8 +91,12 @@ export default function PlayerPage() {
   const [trackClipboard, setTrackClipboard] = useState<Track | null>(null);
 
   // Piano roll editor state
-  const [editingTrackIndex, setEditingTrackIndex] = useState<number | null>(null);
-  const [editorPlaybackState, setEditorPlaybackState] = useState<'stopped' | 'playing' | 'paused'>('stopped');
+  const [editingTrackIndex, setEditingTrackIndex] = useState<number | null>(
+    null,
+  );
+  const [editorPlaybackState, setEditorPlaybackState] = useState<
+    "stopped" | "playing" | "paused"
+  >("stopped");
   const [editorCurrentTick, setEditorCurrentTick] = useState(0);
   const [editorLoopEnabled, setEditorLoopEnabled] = useState(false);
   const [editorLoopStart, setEditorLoopStart] = useState(-1);
@@ -141,11 +177,13 @@ export default function PlayerPage() {
         }
         setTempo(parsed.songData.tempo);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to parse .SON file");
+        setError(
+          err instanceof Error ? err.message : "Failed to parse .SON file",
+        );
         setSong(null);
       }
     },
-    []
+    [],
   );
 
   // Load a demo file
@@ -158,10 +196,12 @@ export default function PlayerPage() {
         const buffer = await response.arrayBuffer();
         handleFileLoad(buffer, name);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load demo file");
+        setError(
+          err instanceof Error ? err.message : "Failed to load demo file",
+        );
       }
     },
-    [handleFileLoad]
+    [handleFileLoad],
   );
 
   // File menu: trigger hidden file input
@@ -184,7 +224,7 @@ export default function PlayerPage() {
       // Reset so the same file can be re-selected
       e.target.value = "";
     },
-    [handleFileLoad]
+    [handleFileLoad],
   );
 
   // Transport controls
@@ -198,7 +238,7 @@ export default function PlayerPage() {
 
   // Toggle loop mode
   const handleToggleLoop = useCallback(() => {
-    setLoopEnabled(prev => {
+    setLoopEnabled((prev) => {
       const next = !prev;
       engineRef.current?.setLoop(next);
       return next;
@@ -216,7 +256,8 @@ export default function PlayerPage() {
   // Switch active pattern (from pattern list fallback)
   const handlePatternChange = useCallback(
     (patternIndex: number) => {
-      if (!song || patternIndex < 0 || patternIndex >= song.patterns.length) return;
+      if (!song || patternIndex < 0 || patternIndex >= song.patterns.length)
+        return;
       const pattern = song.patterns[patternIndex];
 
       engineRef.current?.stop();
@@ -240,51 +281,42 @@ export default function PlayerPage() {
         engineRef.current.setTempo(tempo);
       }
     },
-    [song, tempo]
+    [song, tempo],
   );
 
   // Jump to a specific arrangement entry
-  const handleArrangementJump = useCallback(
-    (arrangementIndex: number) => {
-      if (!engineRef.current) return;
-      engineRef.current.jumpToArrangementEntry(arrangementIndex);
-    },
-    []
-  );
+  const handleArrangementJump = useCallback((arrangementIndex: number) => {
+    if (!engineRef.current) return;
+    engineRef.current.jumpToArrangementEntry(arrangementIndex);
+  }, []);
 
   // Track controls
-  const handleToggleMute = useCallback(
-    (index: number) => {
-      engineRef.current?.toggleMute(index);
-      setMutedTracks((prev) => {
-        const next = new Set(prev);
-        if (next.has(index)) next.delete(index);
-        else next.add(index);
-        return next;
-      });
-    },
-    []
-  );
+  const handleToggleMute = useCallback((index: number) => {
+    engineRef.current?.toggleMute(index);
+    setMutedTracks((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
 
-  const handleToggleSolo = useCallback(
-    (index: number) => {
-      engineRef.current?.toggleSolo(index);
-      setSoloedTracks((prev) => {
-        const next = new Set(prev);
-        if (next.has(index)) next.delete(index);
-        else next.add(index);
-        return next;
-      });
-    },
-    []
-  );
+  const handleToggleSolo = useCallback((index: number) => {
+    engineRef.current?.toggleSolo(index);
+    setSoloedTracks((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
 
   // Context menu trigger
   const handleTrackContextMenu = useCallback(
     (trackIndex: number, x: number, y: number) => {
       setContextMenu({ x, y, trackIndex });
     },
-    []
+    [],
   );
 
   const handleCloseContextMenu = useCallback(() => {
@@ -308,17 +340,17 @@ export default function PlayerPage() {
       });
       setEditingTrackIndex(null);
     },
-    []
+    [],
   );
 
   const handleCloseEditor = useCallback(() => {
     // Stop any editor playback
     const engine = engineRef.current;
-    if (engine && editorPlaybackState !== 'stopped') {
+    if (engine && editorPlaybackState !== "stopped") {
       engine.stop();
       engine.setLoopRegion(-1, -1);
     }
-    setEditorPlaybackState('stopped');
+    setEditorPlaybackState("stopped");
     setEditorCurrentTick(0);
     setEditorLoopEnabled(false);
     setEditorLoopStart(-1);
@@ -332,7 +364,9 @@ export default function PlayerPage() {
   }, [editorPlaybackState, editorSoloed, editingTrackIndex]);
 
   // Editor note preview (supports chord: multiple notes at once)
-  const activePreviewsRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const activePreviewsRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   const handlePreviewNote = useCallback(
     (note: number, velocity: number) => {
@@ -359,25 +393,25 @@ export default function PlayerPage() {
         activePreviewsRef.current.set(note, timer);
       });
     },
-    [song, editingTrackIndex]
+    [song, editingTrackIndex],
   );
 
   // Editor playback controls
   const handleEditorPlay = useCallback(() => {
     engineRef.current?.play();
-    setEditorPlaybackState('playing');
+    setEditorPlaybackState("playing");
   }, []);
 
   const handleEditorPause = useCallback(() => {
     engineRef.current?.pause();
-    setEditorPlaybackState('paused');
+    setEditorPlaybackState("paused");
   }, []);
 
   const handleEditorStop = useCallback(() => {
     engineRef.current?.stop();
     // Always reset to 0 (double-tap stop resets)
     engineRef.current?.seekTo(0);
-    setEditorPlaybackState('stopped');
+    setEditorPlaybackState("stopped");
     setEditorCurrentTick(0);
   }, []);
 
@@ -387,23 +421,26 @@ export default function PlayerPage() {
   }, []);
 
   const handleEditorToggleLoop = useCallback(() => {
-    setEditorLoopEnabled(prev => {
+    setEditorLoopEnabled((prev) => {
       const next = !prev;
       engineRef.current?.setLoop(next);
       return next;
     });
   }, []);
 
-  const handleEditorSetLoopRegion = useCallback((start: number, end: number) => {
-    setEditorLoopStart(start);
-    setEditorLoopEnd(end);
-    engineRef.current?.setLoopRegion(start, end);
-  }, []);
+  const handleEditorSetLoopRegion = useCallback(
+    (start: number, end: number) => {
+      setEditorLoopStart(start);
+      setEditorLoopEnd(end);
+      engineRef.current?.setLoopRegion(start, end);
+    },
+    [],
+  );
 
   const handleEditorToggleSolo = useCallback(() => {
     if (editingTrackIndex === null) return;
     engineRef.current?.toggleSolo(editingTrackIndex);
-    setEditorSoloed(prev => !prev);
+    setEditorSoloed((prev) => !prev);
   }, [editingTrackIndex]);
 
   // Export single track as MIDI
@@ -412,11 +449,15 @@ export default function PlayerPage() {
       if (!song) return;
       const track = song.tracks[trackIndex];
       const trackLabel = track?.name || `Track ${trackIndex + 1}`;
-      const midiData = exportTrackToMidi(song, trackIndex, songName || undefined);
+      const midiData = exportTrackToMidi(
+        song,
+        trackIndex,
+        songName || undefined,
+      );
       const filename = `${(songName || "export").replace(/\s+/g, "_")}_${trackLabel.replace(/\s+/g, "_")}.mid`;
       downloadMidi(midiData, filename);
     },
-    [song, songName]
+    [song, songName],
   );
 
   // Copy track to clipboard
@@ -426,7 +467,7 @@ export default function PlayerPage() {
       const track = song.tracks[trackIndex];
       if (track) setTrackClipboard({ ...track, events: [...track.events] });
     },
-    [song]
+    [song],
   );
 
   // Paste clipboard track onto target
@@ -443,7 +484,7 @@ export default function PlayerPage() {
         return { ...prev, tracks: newTracks };
       });
     },
-    [song, trackClipboard]
+    [song, trackClipboard],
   );
 
   // Delete track
@@ -459,7 +500,7 @@ export default function PlayerPage() {
         setSelectedTrackIndex(Math.max(0, song.tracks.length - 2));
       }
     },
-    [song, selectedTrackIndex]
+    [song, selectedTrackIndex],
   );
 
   // Cut track (copy + delete)
@@ -470,7 +511,7 @@ export default function PlayerPage() {
       if (track) setTrackClipboard({ ...track, events: [...track.events] });
       handleDeleteTrack(trackIndex);
     },
-    [song, handleDeleteTrack]
+    [song, handleDeleteTrack],
   );
 
   // Duplicate track (insert copy below with " 2" suffix)
@@ -503,7 +544,20 @@ export default function PlayerPage() {
         return { ...prev, tracks: newTracks };
       });
     },
-    [song]
+    [song],
+  );
+
+  // Rename track (8 char max enforced by TrackList)
+  const handleRenameTrack = useCallback(
+    (trackIndex: number, newName: string) => {
+      setSong((prev) => {
+        if (!prev) return prev;
+        const newTracks = [...prev.tracks];
+        newTracks[trackIndex] = { ...newTracks[trackIndex], name: newName };
+        return { ...prev, tracks: newTracks };
+      });
+    },
+    [],
   );
 
   // Move track to another pattern
@@ -541,18 +595,20 @@ export default function PlayerPage() {
       });
 
       // Adjust selected track index if needed
-      if (selectedTrackIndex >= (song.tracks.length - 1)) {
+      if (selectedTrackIndex >= song.tracks.length - 1) {
         setSelectedTrackIndex(Math.max(0, song.tracks.length - 2));
       }
     },
-    [song, activePatternIndex, selectedTrackIndex]
+    [song, activePatternIndex, selectedTrackIndex],
   );
 
   // Get selected track info
   const selectedTrack: Track | null = song?.tracks[selectedTrackIndex] ?? null;
-  const noteOns = selectedTrack?.events.filter(e => e.type === "note_on") ?? [];
-  const noteOffs = selectedTrack?.events.filter(e => e.type === "note_off") ?? [];
-  const notes = noteOns.map(e => (e as { note: number }).note);
+  const noteOns =
+    selectedTrack?.events.filter((e) => e.type === "note_on") ?? [];
+  const noteOffs =
+    selectedTrack?.events.filter((e) => e.type === "note_off") ?? [];
+  const notes = noteOns.map((e) => (e as { note: number }).note);
   const minNote = notes.length ? Math.min(...notes) : 0;
   const maxNote = notes.length ? Math.max(...notes) : 0;
 
@@ -590,7 +646,9 @@ export default function PlayerPage() {
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
           <div className="space-y-8">
             <div>
-              <h1 className="mb-2 text-2xl font-bold text-notator-text">Load a Song</h1>
+              <h1 className="mb-2 text-2xl font-bold text-notator-text">
+                Load a Song
+              </h1>
               <p className="mb-6 text-notator-text-muted">
                 Open a Notator SL / Creator .SON file to begin playback
               </p>
@@ -691,56 +749,50 @@ export default function PlayerPage() {
           <div className="flex-1 overflow-y-auto">
             <table className="w-full font-mono text-[11px]">
               <tbody>
-                {song.arrangement.length > 0 ? (
-                  song.arrangement.map((entry, idx) => (
-                    <tr
-                      key={idx}
-                      onClick={() => handleArrangementJump(idx)}
-                      className={`cursor-pointer transition-colors ${
-                        idx === currentArrangementIndex
-                          ? "bg-notator-highlight text-white"
-                          : entry.patternIndex === activePatternIndex
-                            ? "bg-notator-surface-active text-notator-accent"
+                {song.arrangement.length > 0
+                  ? song.arrangement.map((entry, idx) => (
+                      <tr
+                        key={idx}
+                        onClick={() => handleArrangementJump(idx)}
+                        className={`cursor-pointer transition-colors ${
+                          idx === currentArrangementIndex
+                            ? "bg-notator-highlight text-white"
+                            : entry.patternIndex === activePatternIndex
+                              ? "bg-notator-surface-active text-notator-accent"
+                              : "text-notator-text hover:bg-notator-surface-hover"
+                        }`}
+                        id={`arrange-row-${idx}`}
+                      >
+                        <td className="w-8 px-2 py-1.5 text-right text-notator-text-muted">
+                          {entry.bar}
+                        </td>
+                        <td className="px-2 py-1.5 font-bold">{entry.name}</td>
+                        <td className="w-6 px-2 py-1.5 text-right text-notator-text-dim">
+                          {entry.patternIndex + 1}
+                        </td>
+                      </tr>
+                    ))
+                  : /* Fallback: show patterns directly if no arrangement */
+                    song.patterns.map((pat, idx) => (
+                      <tr
+                        key={idx}
+                        onClick={() => handlePatternChange(idx)}
+                        className={`cursor-pointer transition-colors ${
+                          idx === activePatternIndex
+                            ? "bg-notator-highlight text-white"
                             : "text-notator-text hover:bg-notator-surface-hover"
-                      }`}
-                      id={`arrange-row-${idx}`}
-                    >
-                      <td className="w-8 px-2 py-1.5 text-right text-notator-text-muted">
-                        {entry.bar}
-                      </td>
-                      <td className="px-2 py-1.5 font-bold">
-                        {entry.name}
-                      </td>
-                      <td className="w-6 px-2 py-1.5 text-right text-notator-text-dim">
-                        {entry.patternIndex + 1}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  /* Fallback: show patterns directly if no arrangement */
-                  song.patterns.map((pat, idx) => (
-                    <tr
-                      key={idx}
-                      onClick={() => handlePatternChange(idx)}
-                      className={`cursor-pointer transition-colors ${
-                        idx === activePatternIndex
-                          ? "bg-notator-highlight text-white"
-                          : "text-notator-text hover:bg-notator-surface-hover"
-                      }`}
-                      id={`pattern-row-${idx}`}
-                    >
-                      <td className="w-8 px-2 py-1.5 text-right text-notator-text-muted">
-                        {idx + 1}
-                      </td>
-                      <td className="px-2 py-1.5 font-bold">
-                        {pat.name}
-                      </td>
-                      <td className="w-6 px-2 py-1.5 text-right text-notator-text-dim">
-                        {pat.tracks.length}
-                      </td>
-                    </tr>
-                  ))
-                )}
+                        }`}
+                        id={`pattern-row-${idx}`}
+                      >
+                        <td className="w-8 px-2 py-1.5 text-right text-notator-text-muted">
+                          {idx + 1}
+                        </td>
+                        <td className="px-2 py-1.5 font-bold">{pat.name}</td>
+                        <td className="w-6 px-2 py-1.5 text-right text-notator-text-dim">
+                          {pat.tracks.length}
+                        </td>
+                      </tr>
+                    ))}
               </tbody>
             </table>
           </div>
@@ -749,18 +801,23 @@ export default function PlayerPage() {
           <div className="border-t border-notator-border px-3 py-2 text-[10px] text-notator-text-dim">
             <div className="flex justify-between">
               <span>Patterns</span>
-              <span className="text-notator-text-muted">{song.patterns.length}</span>
+              <span className="text-notator-text-muted">
+                {song.patterns.length}
+              </span>
             </div>
             <div className="flex justify-between">
               <span>Entries</span>
-              <span className="text-notator-text-muted">{song.arrangement.length}</span>
+              <span className="text-notator-text-muted">
+                {song.arrangement.length}
+              </span>
             </div>
             <div className="flex justify-between">
               <span>Bars</span>
               <span className="text-notator-text-muted">
                 {song.arrangement.length > 0
                   ? song.arrangement[song.arrangement.length - 1].bar +
-                    song.arrangement[song.arrangement.length - 1].length - 1
+                    song.arrangement[song.arrangement.length - 1].length -
+                    1
                   : Math.ceil(song.totalTicks / song.ticksPerMeasure)}
               </span>
             </div>
@@ -774,19 +831,18 @@ export default function PlayerPage() {
             <span className="font-bold uppercase tracking-widest text-notator-text-dim">
               Status
             </span>
-            <span className="font-bold text-notator-text">
-              {songName}
-            </span>
+            <span className="font-bold text-notator-text">{songName}</span>
             <span className="text-notator-text-dim">
               {song.tracks.length} tracks
             </span>
             <span className="text-notator-text-dim">·</span>
             <span className="text-notator-accent">
-              {song.patterns[activePatternIndex]?.name || `Pattern ${activePatternIndex + 1}`}
+              {song.patterns[activePatternIndex]?.name ||
+                `Pattern ${activePatternIndex + 1}`}
             </span>
             <span className="ml-auto">
               <button
-                onClick={() => setShowTimeline(v => !v)}
+                onClick={() => setShowTimeline((v) => !v)}
                 className={`rounded px-2 py-0.5 text-[9px] font-bold ${
                   showTimeline
                     ? "bg-notator-accent/20 text-notator-accent"
@@ -812,6 +868,7 @@ export default function PlayerPage() {
               onSelectTrack={setSelectedTrackIndex}
               onTrackContextMenu={handleTrackContextMenu}
               onTrackDoubleClick={handleOpenEditor}
+              onRenameTrack={handleRenameTrack}
             />
           </div>
         </main>
@@ -832,12 +889,30 @@ export default function PlayerPage() {
                 {/* Track properties — styled like the original's right panel */}
                 {[
                   { label: "NAME", value: selectedTrack.name || "---" },
-                  { label: "CHANNEL", value: `${String.fromCharCode(65 + Math.floor(selectedTrack.channel / 16))} ${(selectedTrack.channel % 16) + 1}` },
+                  {
+                    label: "CHANNEL",
+                    value: `${String.fromCharCode(65 + Math.floor(selectedTrack.channel / 16))} ${(selectedTrack.channel % 16) + 1}`,
+                  },
                   { label: "QUANTIZE", value: String(song.ticksPerMeasure) },
                   { label: "NOTES", value: String(noteOns.length) },
-                  { label: "RANGE", value: notes.length > 0 ? `${midiNoteName(minNote)}-${midiNoteName(maxNote)}` : "---" },
-                  { label: "VELOCITY", value: notes.length > 0 ? `${Math.min(...noteOns.map(e => (e as { velocity: number }).velocity))}-${Math.max(...noteOns.map(e => (e as { velocity: number }).velocity))}` : "---" },
-                  { label: "EVENTS", value: String(selectedTrack.events.length) },
+                  {
+                    label: "RANGE",
+                    value:
+                      notes.length > 0
+                        ? `${midiNoteName(minNote)}-${midiNoteName(maxNote)}`
+                        : "---",
+                  },
+                  {
+                    label: "VELOCITY",
+                    value:
+                      notes.length > 0
+                        ? `${Math.min(...noteOns.map((e) => (e as { velocity: number }).velocity))}-${Math.max(...noteOns.map((e) => (e as { velocity: number }).velocity))}`
+                        : "---",
+                  },
+                  {
+                    label: "EVENTS",
+                    value: String(selectedTrack.events.length),
+                  },
                   { label: "NOTE ON", value: String(noteOns.length) },
                   { label: "NOTE OFF", value: String(noteOffs.length) },
                 ].map(({ label, value }) => (
@@ -846,7 +921,9 @@ export default function PlayerPage() {
                     className="flex items-center justify-between border-b border-notator-border/30 px-3 py-1.5"
                   >
                     <span className="text-notator-text-dim">{label}</span>
-                    <span className="font-bold tabular-nums text-notator-text">{value}</span>
+                    <span className="font-bold tabular-nums text-notator-text">
+                      {value}
+                    </span>
                   </div>
                 ))}
 
@@ -859,29 +936,65 @@ export default function PlayerPage() {
                       </span>
                     </div>
                     {[
-                      { label: "PORT", value: selectedTrack.trackConfig.midiPort > 0 ? String(selectedTrack.trackConfig.midiPort) : "---" },
-                      { label: "NOTE FILT", value: `${selectedTrack.trackConfig.noteRangeLow || "---"}-${selectedTrack.trackConfig.noteRangeHigh || "---"}` },
+                      {
+                        label: "PORT",
+                        value:
+                          selectedTrack.trackConfig.midiPort > 0
+                            ? String(selectedTrack.trackConfig.midiPort)
+                            : "---",
+                      },
+                      {
+                        label: "NOTE FILT",
+                        value: `${selectedTrack.trackConfig.noteRangeLow || "---"}-${selectedTrack.trackConfig.noteRangeHigh || "---"}`,
+                      },
                     ].map(({ label, value }) => (
                       <div
                         key={label}
                         className="flex items-center justify-between border-b border-notator-border/30 px-3 py-1"
                       >
-                        <span className="text-notator-text-dim text-[10px]">{label}</span>
-                        <span className="font-bold tabular-nums text-notator-text text-[10px]">{value}</span>
+                        <span className="text-notator-text-dim text-[10px]">
+                          {label}
+                        </span>
+                        <span className="font-bold tabular-nums text-notator-text text-[10px]">
+                          {value}
+                        </span>
                       </div>
                     ))}
                     {/* Event type filters */}
                     <div className="px-3 py-1">
                       <div className="flex flex-wrap gap-1">
-                        {([
-                          ["NOTE", !selectedTrack.trackConfig.filters.noteFilter],
-                          ["AT", !selectedTrack.trackConfig.filters.aftertouchFilter],
-                          ["CC", !selectedTrack.trackConfig.filters.ccFilter],
-                          ["PC", !selectedTrack.trackConfig.filters.programFilter],
-                          ["CP", !selectedTrack.trackConfig.filters.channelPressureFilter],
-                          ["PW", !selectedTrack.trackConfig.filters.pitchWheelFilter],
-                          ["SX", !selectedTrack.trackConfig.filters.sysexFilter],
-                        ] as [string, boolean][]).map(([label, enabled]) => (
+                        {(
+                          [
+                            [
+                              "NOTE",
+                              !selectedTrack.trackConfig.filters.noteFilter,
+                            ],
+                            [
+                              "AT",
+                              !selectedTrack.trackConfig.filters
+                                .aftertouchFilter,
+                            ],
+                            ["CC", !selectedTrack.trackConfig.filters.ccFilter],
+                            [
+                              "PC",
+                              !selectedTrack.trackConfig.filters.programFilter,
+                            ],
+                            [
+                              "CP",
+                              !selectedTrack.trackConfig.filters
+                                .channelPressureFilter,
+                            ],
+                            [
+                              "PW",
+                              !selectedTrack.trackConfig.filters
+                                .pitchWheelFilter,
+                            ],
+                            [
+                              "SX",
+                              !selectedTrack.trackConfig.filters.sysexFilter,
+                            ],
+                          ] as [string, boolean][]
+                        ).map(([label, enabled]) => (
                           <span
                             key={label}
                             className={`rounded px-1 py-0.5 text-[8px] font-bold ${
@@ -933,16 +1046,52 @@ export default function PlayerPage() {
                   </span>
                 </div>
                 {[
-                  { label: "PROGRAM", value: song.channelConfig.programs[selectedTrack.channel % 16] !== undefined ? String(song.channelConfig.programs[selectedTrack.channel % 16]) : "---" },
-                  { label: "VOLUME", value: song.channelConfig.volumes[selectedTrack.channel % 16] !== undefined ? String(song.channelConfig.volumes[selectedTrack.channel % 16]) : "---" },
-                  { label: "PAN", value: song.channelConfig.pans[selectedTrack.channel % 16] !== undefined ? String(song.channelConfig.pans[selectedTrack.channel % 16]) : "---" },
+                  {
+                    label: "PROGRAM",
+                    value:
+                      song.channelConfig.programs[
+                        selectedTrack.channel % 16
+                      ] !== undefined
+                        ? String(
+                            song.channelConfig.programs[
+                              selectedTrack.channel % 16
+                            ],
+                          )
+                        : "---",
+                  },
+                  {
+                    label: "VOLUME",
+                    value:
+                      song.channelConfig.volumes[selectedTrack.channel % 16] !==
+                      undefined
+                        ? String(
+                            song.channelConfig.volumes[
+                              selectedTrack.channel % 16
+                            ],
+                          )
+                        : "---",
+                  },
+                  {
+                    label: "PAN",
+                    value:
+                      song.channelConfig.pans[selectedTrack.channel % 16] !==
+                      undefined
+                        ? String(
+                            song.channelConfig.pans[selectedTrack.channel % 16],
+                          )
+                        : "---",
+                  },
                 ].map(({ label, value }) => (
                   <div
                     key={label}
                     className="flex items-center justify-between border-b border-notator-border/30 px-3 py-1"
                   >
-                    <span className="text-notator-text-dim text-[10px]">{label}</span>
-                    <span className="font-bold tabular-nums text-notator-text text-[10px]">{value}</span>
+                    <span className="text-notator-text-dim text-[10px]">
+                      {label}
+                    </span>
+                    <span className="font-bold tabular-nums text-notator-text text-[10px]">
+                      {value}
+                    </span>
                   </div>
                 ))}
 
@@ -953,21 +1102,45 @@ export default function PlayerPage() {
                   </span>
                 </div>
                 {[
-                  { label: "QUANTIZE", value: String(song.headerConfig.quantizeValue || song.ticksPerMeasure) },
-                  { label: "LOOP", value: song.headerConfig.loopEnabled ? "ON" : "OFF" },
-                  { label: "CLICK", value: song.headerConfig.clickTrack ? "ON" : "OFF" },
-                  { label: "PRECOUNT", value: song.headerConfig.precountBars > 0 ? String(song.headerConfig.precountBars) : "---" },
-                  { label: "GROUP", value: (() => {
-                    const g = song.trackGroups.groups[selectedTrackIndex];
-                    return g !== undefined && g > 0 ? String(g) : "---";
-                  })() },
+                  {
+                    label: "QUANTIZE",
+                    value: String(
+                      song.headerConfig.quantizeValue || song.ticksPerMeasure,
+                    ),
+                  },
+                  {
+                    label: "LOOP",
+                    value: song.headerConfig.loopEnabled ? "ON" : "OFF",
+                  },
+                  {
+                    label: "CLICK",
+                    value: song.headerConfig.clickTrack ? "ON" : "OFF",
+                  },
+                  {
+                    label: "PRECOUNT",
+                    value:
+                      song.headerConfig.precountBars > 0
+                        ? String(song.headerConfig.precountBars)
+                        : "---",
+                  },
+                  {
+                    label: "GROUP",
+                    value: (() => {
+                      const g = song.trackGroups.groups[selectedTrackIndex];
+                      return g !== undefined && g > 0 ? String(g) : "---";
+                    })(),
+                  },
                 ].map(({ label, value }) => (
                   <div
                     key={label}
                     className="flex items-center justify-between border-b border-notator-border/30 px-3 py-1"
                   >
-                    <span className="text-notator-text-dim text-[10px]">{label}</span>
-                    <span className="font-bold tabular-nums text-notator-text text-[10px]">{value}</span>
+                    <span className="text-notator-text-dim text-[10px]">
+                      {label}
+                    </span>
+                    <span className="font-bold tabular-nums text-notator-text text-[10px]">
+                      {value}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1008,10 +1181,16 @@ export default function PlayerPage() {
           x={contextMenu.x}
           y={contextMenu.y}
           trackIndex={contextMenu.trackIndex}
-          trackName={song.tracks[contextMenu.trackIndex]?.name || `Track ${contextMenu.trackIndex + 1}`}
+          trackName={
+            song.tracks[contextMenu.trackIndex]?.name ||
+            `Track ${contextMenu.trackIndex + 1}`
+          }
           isMuted={mutedTracks.has(contextMenu.trackIndex)}
           isSoloed={soloedTracks.has(contextMenu.trackIndex)}
-          patterns={song.patterns.map((p, i) => ({ index: i, name: p.name || `Pattern ${i + 1}` }))}
+          patterns={song.patterns.map((p, i) => ({
+            index: i,
+            name: p.name || `Pattern ${i + 1}`,
+          }))}
           activePatternIndex={activePatternIndex}
           hasClipboard={trackClipboard !== null}
           onEdit={() => handleOpenEditor(contextMenu.trackIndex)}
@@ -1023,7 +1202,9 @@ export default function PlayerPage() {
           onPaste={() => handlePasteTrack(contextMenu.trackIndex)}
           onDelete={() => handleDeleteTrack(contextMenu.trackIndex)}
           onDuplicate={() => handleDuplicateTrack(contextMenu.trackIndex)}
-          onMoveToPattern={(patIdx) => handleMoveToPattern(contextMenu.trackIndex, patIdx)}
+          onMoveToPattern={(patIdx) =>
+            handleMoveToPattern(contextMenu.trackIndex, patIdx)
+          }
           onClose={handleCloseContextMenu}
         />
       )}
@@ -1037,7 +1218,7 @@ export default function PlayerPage() {
           ticksPerMeasure={song.ticksPerMeasure}
           totalTicks={song.totalTicks}
           currentTick={editorCurrentTick}
-          isPlaying={editorPlaybackState === 'playing'}
+          isPlaying={editorPlaybackState === "playing"}
           loopEnabled={editorLoopEnabled}
           loopStart={editorLoopStart}
           loopEnd={editorLoopEnd}

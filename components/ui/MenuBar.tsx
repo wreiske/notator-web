@@ -66,22 +66,19 @@ export function MenuBar({ menus }: MenuBarProps) {
       // Only switch on hover if a menu is already open
       if (openIndex !== null) setOpenIndex(idx);
     },
-    [openIndex]
+    [openIndex],
   );
 
-  const handleItemClick = useCallback(
-    (item: MenuItem) => {
-      if (item.disabled || item.separator) return;
+  const handleItemClick = useCallback((item: MenuItem) => {
+    if (item.disabled || item.separator) return;
 
-      if (item.href) {
-        window.open(item.href, "_blank", "noopener,noreferrer");
-      }
+    if (item.href) {
+      window.open(item.href, "_blank", "noopener,noreferrer");
+    }
 
-      item.onClick?.();
-      setOpenIndex(null);
-    },
-    []
-  );
+    item.onClick?.();
+    setOpenIndex(null);
+  }, []);
 
   return (
     <div ref={barRef} className="flex items-center gap-0 relative">
@@ -104,7 +101,10 @@ export function MenuBar({ menus }: MenuBarProps) {
             <div className="notator-menu-dropdown">
               {menu.items.map((item, itemIdx) =>
                 item.separator ? (
-                  <div key={`sep-${itemIdx}`} className="notator-menu-separator" />
+                  <div
+                    key={`sep-${itemIdx}`}
+                    className="notator-menu-separator"
+                  />
                 ) : (
                   <button
                     key={item.label}
@@ -125,7 +125,7 @@ export function MenuBar({ menus }: MenuBarProps) {
                       </span>
                     )}
                   </button>
-                )
+                ),
               )}
             </div>
           )}

@@ -1,13 +1,12 @@
 "use client";
 
-import {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  useMemo,
-} from "react";
-import type { Track, TrackEvent, NoteOnEvent, NoteOffEvent } from "@/lib/son-parser/types";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import type {
+  Track,
+  TrackEvent,
+  NoteOnEvent,
+  NoteOffEvent,
+} from "@/lib/son-parser/types";
 
 // ═══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -16,8 +15,8 @@ import type { Track, TrackEvent, NoteOnEvent, NoteOffEvent } from "@/lib/son-par
 /** A resolved note with start/end for display and editing */
 interface EditorNote {
   id: number;
-  note: number;        // MIDI note 0-127
-  velocity: number;    // 1-127
+  note: number; // MIDI note 0-127
+  velocity: number; // 1-127
   startTick: number;
   endTick: number;
 }
@@ -42,7 +41,20 @@ const SNAP_OPTIONS: SnapOption[] = [
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════
 
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const NOTE_NAMES = [
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+];
 function noteName(n: number): string {
   return `${NOTE_NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
 }
@@ -165,7 +177,7 @@ export function PianoRollEditor({
 }: PianoRollEditorProps) {
   // ─── State ────────────────────────────────────────────────────────
   const [notes, setNotes] = useState<EditorNote[]>(() =>
-    resolveNotes(track.events, totalTicks)
+    resolveNotes(track.events, totalTicks),
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [tool, setTool] = useState<Tool>("pointer");
@@ -193,7 +205,7 @@ export function PianoRollEditor({
       });
       setRedoStack([]); // clear redo on new action
     },
-    [notes]
+    [notes],
   );
 
   const undo = useCallback(() => {
@@ -204,7 +216,11 @@ export function PianoRollEditor({
     // Push current state to redo
     setRedoStack((r) => [
       ...r,
-      { notes: notes.map((n) => ({ ...n })), label: entry.label, timestamp: Date.now() },
+      {
+        notes: notes.map((n) => ({ ...n })),
+        label: entry.label,
+        timestamp: Date.now(),
+      },
     ]);
     setNotes(entry.notes);
     setIsDirty(true);
@@ -218,7 +234,11 @@ export function PianoRollEditor({
     // Push current state to undo
     setUndoStack((u) => [
       ...u,
-      { notes: notes.map((n) => ({ ...n })), label: entry.label, timestamp: Date.now() },
+      {
+        notes: notes.map((n) => ({ ...n })),
+        label: entry.label,
+        timestamp: Date.now(),
+      },
     ]);
     setNotes(entry.notes);
     setIsDirty(true);
@@ -261,13 +281,16 @@ export function PianoRollEditor({
 
   // Canvas dimensions
   const totalMeasures = Math.ceil(totalTicks / ticksPerMeasure) + 2;
-  const canvasWidth = GUTTER_WIDTH + totalMeasures * (ticksPerMeasure / ticksPerBeat) * PIXELS_PER_BEAT;
+  const canvasWidth =
+    GUTTER_WIDTH +
+    totalMeasures * (ticksPerMeasure / ticksPerBeat) * PIXELS_PER_BEAT;
   const canvasHeight = TOTAL_NOTES * NOTE_HEIGHT;
 
   // ─── Note range for auto-scroll ───────────────────────────────────
   const { minNote, maxNote } = useMemo(() => {
     if (notes.length === 0) return { minNote: 48, maxNote: 84 };
-    let mn = 127, mx = 0;
+    let mn = 127,
+      mx = 0;
     for (const n of notes) {
       if (n.note < mn) mn = n.note;
       if (n.note > mx) mx = n.note;
@@ -285,28 +308,25 @@ export function PianoRollEditor({
   // ─── Coordinate helpers ───────────────────────────────────────────
   const tickToX = useCallback(
     (tick: number) => GUTTER_WIDTH + (tick / ticksPerBeat) * PIXELS_PER_BEAT,
-    [ticksPerBeat]
+    [ticksPerBeat],
   );
   const xToTick = useCallback(
     (x: number) => ((x - GUTTER_WIDTH) / PIXELS_PER_BEAT) * ticksPerBeat,
-    [ticksPerBeat]
+    [ticksPerBeat],
   );
-  const noteToY = useCallback(
-    (note: number) => (127 - note) * NOTE_HEIGHT,
-    []
-  );
+  const noteToY = useCallback((note: number) => (127 - note) * NOTE_HEIGHT, []);
   const yToNote = useCallback(
     (y: number) => 127 - Math.floor(y / NOTE_HEIGHT),
-    []
+    [],
   );
   const snapToGrid = useCallback(
     (tick: number) => Math.round(tick / snapTicks) * snapTicks,
-    [snapTicks]
+    [snapTicks],
   );
 
   // ─── Next ID ──────────────────────────────────────────────────────
   const nextIdRef = useRef(
-    notes.length > 0 ? Math.max(...notes.map((n) => n.id)) + 1 : 1
+    notes.length > 0 ? Math.max(...notes.map((n) => n.id)) + 1 : 1,
   );
 
   // ─── Canvas drawing ───────────────────────────────────────────────
@@ -412,7 +432,10 @@ export function PianoRollEditor({
     for (const n of notes) {
       const y = noteToY(n.note) + 1;
       const x = tickToX(n.startTick);
-      const w = Math.max(3, ((n.endTick - n.startTick) / ticksPerBeat) * PIXELS_PER_BEAT);
+      const w = Math.max(
+        3,
+        ((n.endTick - n.startTick) / ticksPerBeat) * PIXELS_PER_BEAT,
+      );
       const isSelected = selectedIds.has(n.id);
 
       // Color based on velocity
@@ -468,7 +491,19 @@ export function PianoRollEditor({
       ctx.strokeRect(mx, my, mw, mh);
       ctx.setLineDash([]);
     }
-  }, [notes, selectedIds, canvasWidth, canvasHeight, ticksPerMeasure, ticksPerBeat, totalMeasures, snapIndex, tickToX, noteToY, marquee]);
+  }, [
+    notes,
+    selectedIds,
+    canvasWidth,
+    canvasHeight,
+    ticksPerMeasure,
+    ticksPerBeat,
+    totalMeasures,
+    snapIndex,
+    tickToX,
+    noteToY,
+    marquee,
+  ]);
 
   // ─── Velocity lane drawing ────────────────────────────────────────
   const drawVelocity = useCallback(() => {
@@ -526,7 +561,7 @@ export function PianoRollEditor({
         lastPreviewNoteRef.current = -1;
       }, 200);
     },
-    [onPreviewNote]
+    [onPreviewNote],
   );
 
   // ─── Ruler drawing ────────────────────────────────────────────────
@@ -631,18 +666,35 @@ export function PianoRollEditor({
     ctx.moveTo(0, RULER_HEIGHT - 0.5);
     ctx.lineTo(canvasWidth, RULER_HEIGHT - 0.5);
     ctx.stroke();
-  }, [canvasWidth, ticksPerMeasure, ticksPerBeat, totalMeasures, currentTick, loopEnabled, loopStart, loopEnd, tickToX]);
+  }, [
+    canvasWidth,
+    ticksPerMeasure,
+    ticksPerBeat,
+    totalMeasures,
+    currentTick,
+    loopEnabled,
+    loopStart,
+    loopEnd,
+    tickToX,
+  ]);
 
   // Redraw on changes
-  useEffect(() => { draw(); }, [draw]);
-  useEffect(() => { drawVelocity(); }, [drawVelocity]);
-  useEffect(() => { drawRuler(); }, [drawRuler]);
+  useEffect(() => {
+    draw();
+  }, [draw]);
+  useEffect(() => {
+    drawVelocity();
+  }, [drawVelocity]);
+  useEffect(() => {
+    drawRuler();
+  }, [drawRuler]);
 
   // Auto-scroll to note range on mount
   useEffect(() => {
     if (containerRef.current && notes.length > 0) {
       const centerNote = Math.floor((minNote + maxNote) / 2);
-      const targetY = noteToY(centerNote) - containerRef.current.clientHeight / 2;
+      const targetY =
+        noteToY(centerNote) - containerRef.current.clientHeight / 2;
       containerRef.current.scrollTop = Math.max(0, targetY);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -661,17 +713,23 @@ export function PianoRollEditor({
         y: (e.clientY - rect.top) * scaleY,
       };
     },
-    [canvasWidth, canvasHeight]
+    [canvasWidth, canvasHeight],
   );
 
   const hitTestNote = useCallback(
-    (x: number, y: number): { note: EditorNote | null; isResizeHandle: boolean } => {
+    (
+      x: number,
+      y: number,
+    ): { note: EditorNote | null; isResizeHandle: boolean } => {
       // Check in reverse order (top-most drawn last)
       for (let i = notes.length - 1; i >= 0; i--) {
         const n = notes[i];
         const ny = noteToY(n.note) + 1;
         const nx = tickToX(n.startTick);
-        const nw = Math.max(3, ((n.endTick - n.startTick) / ticksPerBeat) * PIXELS_PER_BEAT);
+        const nw = Math.max(
+          3,
+          ((n.endTick - n.startTick) / ticksPerBeat) * PIXELS_PER_BEAT,
+        );
 
         if (x >= nx && x <= nx + nw && y >= ny && y <= ny + NOTE_HEIGHT - 2) {
           const isResize = x >= nx + nw - 6;
@@ -680,7 +738,7 @@ export function PianoRollEditor({
       }
       return { note: null, isResizeHandle: false };
     },
-    [notes, noteToY, tickToX, ticksPerBeat]
+    [notes, noteToY, tickToX, ticksPerBeat],
   );
 
   const handleCanvasMouseDown = useCallback(
@@ -710,7 +768,9 @@ export function PianoRollEditor({
 
           // Start drag
           const origSelected = new Map<number, EditorNote>();
-          const idsToMove = selectedIds.has(hitNote.id) ? selectedIds : new Set([hitNote.id]);
+          const idsToMove = selectedIds.has(hitNote.id)
+            ? selectedIds
+            : new Set([hitNote.id]);
           for (const id of idsToMove) {
             const n = notes.find((nn) => nn.id === id);
             if (n) origSelected.set(id, { ...n });
@@ -773,7 +833,19 @@ export function PianoRollEditor({
         }
       }
     },
-    [tool, getCanvasCoords, hitTestNote, selectedIds, notes, yToNote, xToTick, snapToGrid, snapTicks, previewNote, pushHistory]
+    [
+      tool,
+      getCanvasCoords,
+      hitTestNote,
+      selectedIds,
+      notes,
+      yToNote,
+      xToTick,
+      snapToGrid,
+      snapTicks,
+      previewNote,
+      pushHistory,
+    ],
   );
 
   const handleCanvasMouseMove = useCallback(
@@ -782,7 +854,7 @@ export function PianoRollEditor({
 
       // Marquee drag
       if (marquee) {
-        setMarquee((prev) => prev ? { ...prev, endX: x, endY: y } : null);
+        setMarquee((prev) => (prev ? { ...prev, endX: x, endY: y } : null));
 
         // Live-select notes within the rectangle
         const mx1 = Math.min(marquee.startX, x);
@@ -793,7 +865,10 @@ export function PianoRollEditor({
         const newSelection = new Set<number>();
         for (const n of notes) {
           const nx = tickToX(n.startTick);
-          const nw = Math.max(3, ((n.endTick - n.startTick) / ticksPerBeat) * PIXELS_PER_BEAT);
+          const nw = Math.max(
+            3,
+            ((n.endTick - n.startTick) / ticksPerBeat) * PIXELS_PER_BEAT,
+          );
           const ny = noteToY(n.note);
           const nh = NOTE_HEIGHT - 2;
 
@@ -815,16 +890,23 @@ export function PianoRollEditor({
         const semitoneShift = -Math.round(dy / NOTE_HEIGHT);
         // Check if pitch actually changed from current notes
         const anchorOrig = dragState.origNote;
-        const newAnchorPitch = Math.max(0, Math.min(127, anchorOrig.note + semitoneShift));
-        const currentAnchorNote = notes.find(n => n.id === dragState.noteId);
-        const pitchChanged = currentAnchorNote && newAnchorPitch !== currentAnchorNote.note;
+        const newAnchorPitch = Math.max(
+          0,
+          Math.min(127, anchorOrig.note + semitoneShift),
+        );
+        const currentAnchorNote = notes.find((n) => n.id === dragState.noteId);
+        const pitchChanged =
+          currentAnchorNote && newAnchorPitch !== currentAnchorNote.note;
 
         if (pitchChanged && onPreviewNote) {
           // Preview ALL selected notes at their new pitches as a chord
           lastPreviewNoteRef.current = -1; // reset dedup to allow chord
           for (const [id, orig] of dragState.origSelectedNotes) {
-            const newPitch = Math.max(0, Math.min(127, orig.note + semitoneShift));
-            const vel = notes.find(n => n.id === id)?.velocity ?? 100;
+            const newPitch = Math.max(
+              0,
+              Math.min(127, orig.note + semitoneShift),
+            );
+            const vel = notes.find((n) => n.id === id)?.velocity ?? 100;
             onPreviewNote(newPitch, vel);
           }
           if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
@@ -840,10 +922,15 @@ export function PianoRollEditor({
           if (!orig) return n;
 
           if (dragState.type === "move") {
-            const newTick = snapToGrid(orig.startTick + (dx / PIXELS_PER_BEAT) * ticksPerBeat);
+            const newTick = snapToGrid(
+              orig.startTick + (dx / PIXELS_PER_BEAT) * ticksPerBeat,
+            );
             const duration = orig.endTick - orig.startTick;
             const semitoneShift = -Math.round(dy / NOTE_HEIGHT);
-            const newNotePitch = Math.max(0, Math.min(127, orig.note + semitoneShift));
+            const newNotePitch = Math.max(
+              0,
+              Math.min(127, orig.note + semitoneShift),
+            );
             return {
               ...n,
               startTick: Math.max(0, newTick),
@@ -852,17 +939,30 @@ export function PianoRollEditor({
             };
           } else {
             // Resize
-            const newEnd = snapToGrid(orig.endTick + (dx / PIXELS_PER_BEAT) * ticksPerBeat);
+            const newEnd = snapToGrid(
+              orig.endTick + (dx / PIXELS_PER_BEAT) * ticksPerBeat,
+            );
             return {
               ...n,
               endTick: Math.max(n.startTick + snapTicks, newEnd),
             };
           }
-        })
+        }),
       );
       setIsDirty(true);
     },
-    [dragState, getCanvasCoords, snapToGrid, ticksPerBeat, snapTicks, onPreviewNote, marquee, notes, tickToX, noteToY]
+    [
+      dragState,
+      getCanvasCoords,
+      snapToGrid,
+      ticksPerBeat,
+      snapTicks,
+      onPreviewNote,
+      marquee,
+      notes,
+      tickToX,
+      noteToY,
+    ],
   );
 
   const handleCanvasMouseUp = useCallback(() => {
@@ -891,13 +991,26 @@ export function PianoRollEditor({
         }
       } else if (e.altKey || e.metaKey) {
         // Alt/Cmd+click = set loop start, shift determines end
-        onSetLoopRegion?.(snappedTick, loopEnd > snappedTick ? loopEnd : snappedTick + ticksPerMeasure);
+        onSetLoopRegion?.(
+          snappedTick,
+          loopEnd > snappedTick ? loopEnd : snappedTick + ticksPerMeasure,
+        );
       } else {
         // Normal click = seek
         onSeek?.(snappedTick);
       }
     },
-    [canvasWidth, xToTick, snapToGrid, onSeek, onSetLoopRegion, loopEnabled, loopStart, loopEnd, ticksPerMeasure]
+    [
+      canvasWidth,
+      xToTick,
+      snapToGrid,
+      onSeek,
+      onSetLoopRegion,
+      loopEnabled,
+      loopStart,
+      loopEnd,
+      ticksPerMeasure,
+    ],
   );
 
   // ─── Keyboard shortcuts ───────────────────────────────────────────
@@ -924,6 +1037,20 @@ export function PianoRollEditor({
         return;
       }
 
+      // Toggle loop (L key)
+      if (e.key === "l" || e.key === "L") {
+        e.preventDefault();
+        onToggleLoop?.();
+        return;
+      }
+
+      // Toggle solo (S key, but not with cmd/ctrl for save)
+      if ((e.key === "s" || e.key === "S") && !(e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        onToggleSolo?.();
+        return;
+      }
+
       if (selectedIds.size === 0) {
         if (e.key === "Escape") onClose();
         return;
@@ -939,8 +1066,8 @@ export function PianoRollEditor({
             prev.map((n) =>
               selectedIds.has(n.id)
                 ? { ...n, note: Math.min(127, n.note + (shift ? 12 : 1)) }
-                : n
-            )
+                : n,
+            ),
           );
           setIsDirty(true);
           break;
@@ -950,8 +1077,8 @@ export function PianoRollEditor({
             prev.map((n) =>
               selectedIds.has(n.id)
                 ? { ...n, note: Math.max(0, n.note - (shift ? 12 : 1)) }
-                : n
-            )
+                : n,
+            ),
           );
           setIsDirty(true);
           break;
@@ -965,8 +1092,8 @@ export function PianoRollEditor({
                     startTick: Math.max(0, n.startTick - snapTicks),
                     endTick: Math.max(snapTicks, n.endTick - snapTicks),
                   }
-                : n
-            )
+                : n,
+            ),
           );
           setIsDirty(true);
           break;
@@ -980,14 +1107,16 @@ export function PianoRollEditor({
                     startTick: n.startTick + snapTicks,
                     endTick: n.endTick + snapTicks,
                   }
-                : n
-            )
+                : n,
+            ),
           );
           setIsDirty(true);
           break;
         case "Delete":
         case "Backspace":
-          pushHistory(`Delete ${selectedIds.size} note${selectedIds.size > 1 ? 's' : ''}`);
+          pushHistory(
+            `Delete ${selectedIds.size} note${selectedIds.size > 1 ? "s" : ""}`,
+          );
           setNotes((prev) => prev.filter((n) => !selectedIds.has(n.id)));
           setSelectedIds(new Set());
           setIsDirty(true);
@@ -1016,17 +1145,30 @@ export function PianoRollEditor({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedIds, notes, snapTicks, onClose, isPlaying, onPlay, onPause, undo, redo, pushHistory]);
+  }, [
+    selectedIds,
+    notes,
+    snapTicks,
+    onClose,
+    isPlaying,
+    onPlay,
+    onPause,
+    undo,
+    redo,
+    pushHistory,
+    onToggleLoop,
+    onToggleSolo,
+  ]);
 
   // ─── Toolbar actions ──────────────────────────────────────────────
   const handleSave = useCallback(() => {
     // Keep non-note events from original track
     const nonNoteEvents = track.events.filter(
-      (e) => e.type !== "note_on" && e.type !== "note_off"
+      (e) => e.type !== "note_on" && e.type !== "note_off",
     );
     const noteEvents = notesToEvents(notes);
     const allEvents = [...nonNoteEvents, ...noteEvents].sort(
-      (a, b) => a.tick - b.tick
+      (a, b) => a.tick - b.tick,
     );
     onSave(trackIndex, allEvents);
   }, [notes, track, trackIndex, onSave]);
@@ -1039,12 +1181,12 @@ export function PianoRollEditor({
         prev.map((n) =>
           selectedIds.has(n.id)
             ? { ...n, note: Math.max(0, Math.min(127, n.note + semitones)) }
-            : n
-        )
+            : n,
+        ),
       );
       setIsDirty(true);
     },
-    [selectedIds, pushHistory]
+    [selectedIds, pushHistory],
   );
 
   const handleSelectAll = useCallback(() => {
@@ -1052,7 +1194,9 @@ export function PianoRollEditor({
   }, [notes]);
 
   const handleDeleteSelected = useCallback(() => {
-    pushHistory(`Delete ${selectedIds.size} note${selectedIds.size > 1 ? 's' : ''}`);
+    pushHistory(
+      `Delete ${selectedIds.size} note${selectedIds.size > 1 ? "s" : ""}`,
+    );
     setNotes((prev) => prev.filter((n) => !selectedIds.has(n.id)));
     setSelectedIds(new Set());
     setIsDirty(true);
@@ -1067,7 +1211,7 @@ export function PianoRollEditor({
       const sub = remaining % ticksPerBeat;
       return `${bar}.${beat}.${sub}`;
     },
-    [ticksPerMeasure, ticksPerBeat]
+    [ticksPerMeasure, ticksPerBeat],
   );
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1102,7 +1246,7 @@ export function PianoRollEditor({
             </button>
             <button
               onClick={isPlaying ? onPause : onPlay}
-              className={`notator-piano-roll-tool-btn ${isPlaying ? 'notator-piano-roll-tool-active' : ''}`}
+              className={`notator-piano-roll-tool-btn ${isPlaying ? "notator-piano-roll-tool-active" : ""}`}
               title={isPlaying ? "Pause" : "Play"}
               id="pr-play"
             >
@@ -1120,26 +1264,34 @@ export function PianoRollEditor({
           {/* Loop toggle */}
           <button
             onClick={onToggleLoop}
-            className={`notator-piano-roll-tool-btn text-[9px] w-auto px-2 ${
-              loopEnabled ? 'notator-piano-roll-tool-active' : ''
+            className={`notator-piano-roll-tool-btn ${
+              loopEnabled ? "notator-piano-roll-tool-active" : ""
             }`}
-            title="Toggle Loop"
+            title="Toggle Loop (L)"
             id="pr-loop"
           >
-            ↻ Loop
+            ↻
           </button>
 
           {/* Solo toggle */}
           <button
             onClick={onToggleSolo}
-            className={`notator-piano-roll-tool-btn text-[9px] w-auto px-2 ${
-              isSoloed ? 'notator-piano-roll-tool-active' : ''
+            className={`notator-piano-roll-tool-btn ${
+              isSoloed ? "notator-piano-roll-tool-active" : ""
             }`}
-            title="Solo this track"
+            title="Solo this track (S)"
             id="pr-solo"
-            style={isSoloed ? { borderColor: '#ffbb44', color: '#ffbb44', background: 'rgba(255,187,68,0.15)' } : undefined}
+            style={
+              isSoloed
+                ? {
+                    borderColor: "#ffbb44",
+                    color: "#ffbb44",
+                    background: "rgba(255,187,68,0.15)",
+                  }
+                : undefined
+            }
           >
-            S Solo
+            S
           </button>
 
           {/* Snap selector */}
@@ -1151,7 +1303,9 @@ export function PianoRollEditor({
             id="snap-select"
           >
             {SNAP_OPTIONS.map((opt, i) => (
-              <option key={i} value={i}>{opt.label}</option>
+              <option key={i} value={i}>
+                {opt.label}
+              </option>
             ))}
           </select>
 
@@ -1209,15 +1363,22 @@ export function PianoRollEditor({
                 {[
                   { label: "NOTE", value: noteName(selectedNote.note) },
                   { label: "VELOCITY", value: String(selectedNote.velocity) },
-                  { label: "POSITION", value: formatPosition(selectedNote.startTick) },
+                  {
+                    label: "POSITION",
+                    value: formatPosition(selectedNote.startTick),
+                  },
                   {
                     label: "LENGTH",
-                    value: formatPosition(selectedNote.endTick - selectedNote.startTick),
+                    value: formatPosition(
+                      selectedNote.endTick - selectedNote.startTick,
+                    ),
                   },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex justify-between">
                     <span className="text-notator-text-dim">{label}</span>
-                    <span className="font-bold tabular-nums text-notator-text">{value}</span>
+                    <span className="font-bold tabular-nums text-notator-text">
+                      {value}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1276,11 +1437,15 @@ export function PianoRollEditor({
               <div className="space-y-1 text-[10px]">
                 <div className="flex justify-between">
                   <span className="text-notator-text-dim">START</span>
-                  <span className="font-bold tabular-nums text-notator-green">{formatPosition(loopStart)}</span>
+                  <span className="font-bold tabular-nums text-notator-green">
+                    {formatPosition(loopStart)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-notator-text-dim">END</span>
-                  <span className="font-bold tabular-nums text-notator-green">{formatPosition(loopEnd)}</span>
+                  <span className="font-bold tabular-nums text-notator-green">
+                    {formatPosition(loopEnd)}
+                  </span>
                 </div>
                 <button
                   onClick={() => onSetLoopRegion?.(-1, -1)}
@@ -1350,23 +1515,33 @@ export function PianoRollEditor({
             </div>
             <div className="max-h-24 overflow-y-auto space-y-0.5">
               {undoStack.length === 0 && redoStack.length === 0 ? (
-                <div className="text-[9px] text-notator-text-dim">No actions yet</div>
+                <div className="text-[9px] text-notator-text-dim">
+                  No actions yet
+                </div>
               ) : (
                 <>
-                  {[...undoStack].reverse().slice(0, 8).map((entry, i) => (
-                    <div
-                      key={`u-${i}`}
-                      className={`text-[8px] px-1 py-0.5 rounded ${
-                        i === 0 ? "bg-notator-green/10 text-notator-green" : "text-notator-text-dim"
-                      }`}
-                    >
-                      {i === 0 ? "▸ " : "  "}{entry.label}
-                    </div>
-                  ))}
+                  {[...undoStack]
+                    .reverse()
+                    .slice(0, 8)
+                    .map((entry, i) => (
+                      <div
+                        key={`u-${i}`}
+                        className={`text-[8px] px-1 py-0.5 rounded ${
+                          i === 0
+                            ? "bg-notator-green/10 text-notator-green"
+                            : "text-notator-text-dim"
+                        }`}
+                      >
+                        {i === 0 ? "▸ " : "  "}
+                        {entry.label}
+                      </div>
+                    ))}
                   {redoStack.length > 0 && (
                     <div className="text-[8px] px-1 text-notator-text-dim opacity-50 border-t border-notator-border pt-0.5 mt-0.5">
                       {[...redoStack].reverse().map((entry, i) => (
-                        <div key={`r-${i}`} className="line-through">{entry.label}</div>
+                        <div key={`r-${i}`} className="line-through">
+                          {entry.label}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -1384,6 +1559,8 @@ export function PianoRollEditor({
               <div>⌘Z undo</div>
               <div>⌘⇧Z redo</div>
               <div>Space play/pause</div>
+              <div>L toggle loop</div>
+              <div>S toggle solo</div>
               <div>↑↓ ±1 semitone</div>
               <div>⇧↑↓ ±1 octave</div>
               <div>←→ move in time</div>
@@ -1399,7 +1576,10 @@ export function PianoRollEditor({
         {/* ─── CANVAS AREA ──────────────────────────────────────── */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Ruler / scrubber */}
-          <div className="flex-shrink-0 overflow-x-auto overflow-y-hidden" style={{ height: RULER_HEIGHT }}>
+          <div
+            className="flex-shrink-0 overflow-x-auto overflow-y-hidden"
+            style={{ height: RULER_HEIGHT }}
+          >
             <canvas
               ref={rulerCanvasRef}
               onMouseDown={handleRulerMouseDown}
@@ -1411,7 +1591,14 @@ export function PianoRollEditor({
           <div
             ref={containerRef}
             className="flex-1 overflow-auto"
-            style={{ cursor: tool === "draw" ? "crosshair" : tool === "erase" ? "not-allowed" : "default" }}
+            style={{
+              cursor:
+                tool === "draw"
+                  ? "crosshair"
+                  : tool === "erase"
+                    ? "not-allowed"
+                    : "default",
+            }}
           >
             <canvas
               ref={canvasRef}
@@ -1423,7 +1610,8 @@ export function PianoRollEditor({
           </div>
 
           {/* Velocity lane */}
-          <div className="border-t border-notator-border overflow-x-auto overflow-y-hidden flex-shrink-0"
+          <div
+            className="border-t border-notator-border overflow-x-auto overflow-y-hidden flex-shrink-0"
             style={{ height: VELOCITY_HEIGHT }}
           >
             <canvas ref={velocityCanvasRef} />

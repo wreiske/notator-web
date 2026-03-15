@@ -47,8 +47,7 @@ export function serializeSonFile(sonFile: SonFile): Uint8Array {
     const boundary = sonFile.boundaries[i];
 
     // Write boundary marker
-    const marker =
-      boundary?.type === "B" ? BOUNDARY_B : BOUNDARY_A;
+    const marker = boundary?.type === "B" ? BOUNDARY_B : BOUNDARY_A;
     output.set(marker, pos);
     pos += 4;
 
@@ -105,9 +104,12 @@ export function setHeaderField(
   sonFile: SonFile,
   offset: number,
   value: number,
-  size: 1 | 2 | 4 = 2
+  size: 1 | 2 | 4 = 2,
 ): void {
-  const view = new DataView(sonFile.rawHeader.buffer, sonFile.rawHeader.byteOffset);
+  const view = new DataView(
+    sonFile.rawHeader.buffer,
+    sonFile.rawHeader.byteOffset,
+  );
   switch (size) {
     case 1:
       view.setUint8(offset, value);

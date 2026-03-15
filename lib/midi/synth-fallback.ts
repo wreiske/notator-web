@@ -24,7 +24,7 @@ declare class WebAudioFontPlayer {
     pitch: number,
     duration: number,
     volume?: number,
-    slides?: any[]
+    slides?: any[],
   ): any;
   cancelQueue(audioContext: AudioContext): void;
   adjustPreset(audioContext: AudioContext, preset: any): void;
@@ -101,13 +101,13 @@ export class SynthFallback {
     // WebAudioFont has no ESM/CJS exports — it sets globals via script tag.
     // Load it from node_modules build output served by Next.js.
     if (!(window as any).WebAudioFontPlayer) {
-      await this.loadScript(
-        "/webaudiofont/WebAudioFontPlayer.js"
-      );
+      await this.loadScript("/webaudiofont/WebAudioFontPlayer.js");
     }
 
     if ((window as any).WebAudioFontPlayer) {
-      this.player = new (window as any).WebAudioFontPlayer() as WebAudioFontPlayer;
+      this.player = new (
+        window as any
+      ).WebAudioFontPlayer() as WebAudioFontPlayer;
       console.log("[GM] WebAudioFont player initialized");
 
       // Pre-load piano (program 0) and standard drum kit
@@ -149,7 +149,7 @@ export class SynthFallback {
         this.audioContext.currentTime,
         note,
         1.5, // Duration for drums (they're percussive, will decay)
-        volume
+        volume,
       );
 
       this.activeNotes.set(key, { envelope, channel, note });
@@ -170,7 +170,7 @@ export class SynthFallback {
         this.audioContext.currentTime,
         note,
         10, // Long duration — noteOff will cut it short
-        volume
+        volume,
       );
 
       this.activeNotes.set(key, { envelope, channel, note });
@@ -189,7 +189,7 @@ export class SynthFallback {
     try {
       if (active.envelope.audioBufferSourceNode) {
         active.envelope.audioBufferSourceNode.stop(
-          this.audioContext.currentTime + 0.05
+          this.audioContext.currentTime + 0.05,
         );
       }
     } catch {
@@ -328,8 +328,7 @@ export class SynthFallback {
       script.type = "text/javascript";
       script.src = url;
       script.onload = () => resolve();
-      script.onerror = () =>
-        reject(new Error(`Failed to load font: ${url}`));
+      script.onerror = () => reject(new Error(`Failed to load font: ${url}`));
       document.head.appendChild(script);
     });
   }

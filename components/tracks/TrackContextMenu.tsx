@@ -104,7 +104,10 @@ export function TrackContextMenu({
       {/* Edit Track */}
       <button
         className="notator-menu-item"
-        onClick={() => { onEdit(); onClose(); }}
+        onClick={() => {
+          onEdit();
+          onClose();
+        }}
         id="ctx-edit"
       >
         <span className="mr-2 text-notator-accent">✎</span>
@@ -114,7 +117,10 @@ export function TrackContextMenu({
       {/* Export MIDI */}
       <button
         className="notator-menu-item"
-        onClick={() => { onExportMidi(); onClose(); }}
+        onClick={() => {
+          onExportMidi();
+          onClose();
+        }}
         id="ctx-export-midi"
       >
         <span className="mr-2 text-notator-text-dim">↓</span>
@@ -126,20 +132,30 @@ export function TrackContextMenu({
       {/* Mute / Solo */}
       <button
         className="notator-menu-item"
-        onClick={() => { onToggleMute(); onClose(); }}
+        onClick={() => {
+          onToggleMute();
+          onClose();
+        }}
         id="ctx-mute"
       >
-        <span className={`mr-2 ${isMuted ? "text-notator-red" : "text-notator-text-dim"}`}>
+        <span
+          className={`mr-2 ${isMuted ? "text-notator-red" : "text-notator-text-dim"}`}
+        >
           M
         </span>
         {isMuted ? "Unmute Track" : "Mute Track"}
       </button>
       <button
         className="notator-menu-item"
-        onClick={() => { onToggleSolo(); onClose(); }}
+        onClick={() => {
+          onToggleSolo();
+          onClose();
+        }}
         id="ctx-solo"
       >
-        <span className={`mr-2 ${isSoloed ? "text-notator-amber" : "text-notator-text-dim"}`}>
+        <span
+          className={`mr-2 ${isSoloed ? "text-notator-amber" : "text-notator-text-dim"}`}
+        >
           S
         </span>
         {isSoloed ? "Unsolo Track" : "Solo Track"}
@@ -150,7 +166,10 @@ export function TrackContextMenu({
       {/* Copy / Paste */}
       <button
         className="notator-menu-item"
-        onClick={() => { onCopy(); onClose(); }}
+        onClick={() => {
+          onCopy();
+          onClose();
+        }}
         id="ctx-copy"
       >
         <span className="mr-2 text-notator-text-dim">⎘</span>
@@ -158,7 +177,10 @@ export function TrackContextMenu({
       </button>
       <button
         className="notator-menu-item"
-        onClick={() => { onCut(); onClose(); }}
+        onClick={() => {
+          onCut();
+          onClose();
+        }}
         id="ctx-cut"
       >
         <span className="mr-2 text-notator-text-dim">✂</span>
@@ -166,7 +188,12 @@ export function TrackContextMenu({
       </button>
       <button
         className={`notator-menu-item ${!hasClipboard ? "notator-menu-item-disabled" : ""}`}
-        onClick={() => { if (hasClipboard) { onPaste(); onClose(); } }}
+        onClick={() => {
+          if (hasClipboard) {
+            onPaste();
+            onClose();
+          }
+        }}
         id="ctx-paste"
       >
         <span className="mr-2 text-notator-text-dim">⎗</span>
@@ -178,7 +205,10 @@ export function TrackContextMenu({
       {/* Delete */}
       <button
         className="notator-menu-item"
-        onClick={() => { onDelete(); onClose(); }}
+        onClick={() => {
+          onDelete();
+          onClose();
+        }}
         id="ctx-delete"
       >
         <span className="mr-2 text-notator-red">✕</span>
@@ -188,7 +218,10 @@ export function TrackContextMenu({
       {/* Duplicate */}
       <button
         className="notator-menu-item"
-        onClick={() => { onDuplicate(); onClose(); }}
+        onClick={() => {
+          onDuplicate();
+          onClose();
+        }}
         id="ctx-duplicate"
       >
         <span className="mr-2 text-notator-text-dim">⊕</span>
@@ -208,10 +241,15 @@ export function TrackContextMenu({
               <button
                 key={pat.index}
                 className="notator-menu-item"
-                onClick={() => { onMoveToPattern(pat.index); onClose(); }}
+                onClick={() => {
+                  onMoveToPattern(pat.index);
+                  onClose();
+                }}
                 id={`ctx-move-pattern-${pat.index}`}
               >
-                <span className="mr-2 text-notator-text-dim">{pat.index + 1}</span>
+                <span className="mr-2 text-notator-text-dim">
+                  {pat.index + 1}
+                </span>
                 {pat.name}
               </button>
             ))}

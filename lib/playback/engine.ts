@@ -9,7 +9,11 @@
  * pattern can appear multiple times in the arrangement (e.g. drum loops).
  */
 
-import type { SongData, TrackEvent, ArrangementEntry } from "@/lib/son-parser/types";
+import type {
+  SongData,
+  TrackEvent,
+  ArrangementEntry,
+} from "@/lib/son-parser/types";
 import { SynthFallback } from "@/lib/midi/synth-fallback";
 import {
   type MidiOutput,
@@ -28,7 +32,10 @@ interface PlaybackCallbacks {
   /** Called when the engine advances to a new arrangement entry */
   onPatternChange?: (patternIndex: number) => void;
   /** Called with the arrangement entry index during arrangement-mode playback */
-  onArrangementChange?: (arrangementIndex: number, patternIndex: number) => void;
+  onArrangementChange?: (
+    arrangementIndex: number,
+    patternIndex: number,
+  ) => void;
 }
 
 interface ScheduledTrack {
@@ -146,11 +153,15 @@ export class PlaybackEngine {
   /** Seek to a specific tick position */
   seekTo(tick: number): void {
     if (!this.song) return;
-    const clampedTick = Math.max(0, Math.min(tick, this.currentEntryTotalTicks));
+    const clampedTick = Math.max(
+      0,
+      Math.min(tick, this.currentEntryTotalTicks),
+    );
 
     if (this.state === "playing") {
       // Rebase the start time so getCurrentTick() returns the new position
-      this.startTime = performance.now() / 1000 - this.ticksToSeconds(clampedTick);
+      this.startTime =
+        performance.now() / 1000 - this.ticksToSeconds(clampedTick);
       // Reset track scheduling to re-scan from the new position
       this.resetTrackStateFromTick(clampedTick);
       this.silenceAll();
@@ -194,8 +205,7 @@ export class PlaybackEngine {
 
     if (this.state === "paused") {
       this.startTime =
-        performance.now() / 1000 -
-        this.ticksToSeconds(this.pausePosition);
+        performance.now() / 1000 - this.ticksToSeconds(this.pausePosition);
     } else {
       // Starting from the beginning — reload the first arrangement entry
       if (this.useArrangement && this.currentArrangementIndex !== 0) {
@@ -243,7 +253,11 @@ export class PlaybackEngine {
   /** Jump to a specific arrangement entry (for UI clicks) */
   jumpToArrangementEntry(arrangementIndex: number): void {
     if (!this.song || !this.useArrangement) return;
-    if (arrangementIndex < 0 || arrangementIndex >= this.song.arrangement.length) return;
+    if (
+      arrangementIndex < 0 ||
+      arrangementIndex >= this.song.arrangement.length
+    )
+      return;
 
     const wasPlaying = this.state === "playing";
     this.stopScheduler();
@@ -359,7 +373,7 @@ export class PlaybackEngine {
 
     if (!pattern) {
       console.warn(
-        `[Engine] Arrangement entry ${arrangementIndex} references missing pattern ${entry.patternIndex}`
+        `[Engine] Arrangement entry ${arrangementIndex} references missing pattern ${entry.patternIndex}`,
       );
       return;
     }
@@ -374,7 +388,10 @@ export class PlaybackEngine {
     // Use the shorter of: entry duration or actual pattern data length
     // This ensures we don't play beyond the arrangement entry's bars,
     // but also don't wait forever if the pattern data is shorter
-    this.currentEntryTotalTicks = Math.min(entryDurationTicks, pattern.totalTicks || entryDurationTicks);
+    this.currentEntryTotalTicks = Math.min(
+      entryDurationTicks,
+      pattern.totalTicks || entryDurationTicks,
+    );
 
     // Load the pattern's tracks into the scheduler
     this.scheduledTracks = pattern.tracks.map((track) => ({
@@ -387,7 +404,7 @@ export class PlaybackEngine {
       `[Engine] Loaded arrangement entry ${arrangementIndex + 1}/${arrangement.length}: ` +
         `pattern "${pattern.name}" (idx=${entry.patternIndex}), ` +
         `bars ${entry.bar}–${entry.bar + entry.length - 1}, ` +
-        `${this.currentEntryTotalTicks} ticks`
+        `${this.currentEntryTotalTicks} ticks`,
     );
 
     // Notify UI
@@ -470,7 +487,7 @@ export class PlaybackEngine {
 
       console.log(
         `[Engine] Advanced to pattern ${nextIndex + 1} ` +
-          `(${nextPattern.tracks.length} tracks, ${nextPattern.totalTicks} ticks)`
+          `(${nextPattern.tracks.length} tracks, ${nextPattern.totalTicks} ticks)`,
       );
 
       // Continue the scheduler loop
@@ -495,7 +512,10 @@ export class PlaybackEngine {
         case "program_change":
           // Send MIDI program change to hardware
           if (this.midiOutput.send) {
-            this.midiOutput.send([0xc0 | (channel & 0x0f), event.program & 0x7f]);
+            this.midiOutput.send([
+              0xc0 | (channel & 0x0f),
+              event.program & 0x7f,
+            ]);
           }
           break;
       }
@@ -565,4 +585,3 @@ export class PlaybackEngine {
     this.synth.destroy();
   }
 }
-

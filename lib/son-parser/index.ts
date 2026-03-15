@@ -72,8 +72,7 @@ const BOUNDARY_B = [0x00, 0x0f, 0xff, 0xff] as const;
 const TRACK_HEADER_SIZE = 24;
 const TRACK_NAME_SIZE = 8;
 const TRACK_CONFIG_SIZE = 14;
-const TRACK_PREAMBLE =
-  TRACK_HEADER_SIZE + TRACK_NAME_SIZE + TRACK_CONFIG_SIZE; // 46 bytes
+const TRACK_PREAMBLE = TRACK_HEADER_SIZE + TRACK_NAME_SIZE + TRACK_CONFIG_SIZE; // 46 bytes
 const EVENT_SIZE = 6;
 const TRACKS_PER_PATTERN = 16;
 
@@ -91,7 +90,7 @@ export function parseSonFile(buffer: ArrayBuffer): SonFile {
 
   if (data.length < TRACK_DATA_OFFSET) {
     throw new Error(
-      `File too small (${data.length} bytes, need at least ${TRACK_DATA_OFFSET})`
+      `File too small (${data.length} bytes, need at least ${TRACK_DATA_OFFSET})`,
     );
   }
 
@@ -102,13 +101,13 @@ export function parseSonFile(buffer: ArrayBuffer): SonFile {
   const header = parseHeader(data, view);
 
   // ─── Split track region on boundaries ───────────────────────────
-  const { chunks, boundaries, preBoundaryPadding } =
-    splitOnBoundariesWithInfo(data, TRACK_DATA_OFFSET);
+  const { chunks, boundaries, preBoundaryPadding } = splitOnBoundariesWithInfo(
+    data,
+    TRACK_DATA_OFFSET,
+  );
 
   // ─── Parse ALL track slots ─────────────────────────────────────
-  const trackSlots: TrackSlot[] = chunks.map((chunk) =>
-    parseTrackSlot(chunk)
-  );
+  const trackSlots: TrackSlot[] = chunks.map((chunk) => parseTrackSlot(chunk));
 
   // ─── Build playback-oriented SongData ───────────────────────────
   const songData = buildSongData(header, trackSlots, data, view);
@@ -128,7 +127,7 @@ export function parseSonFile(buffer: ArrayBuffer): SonFile {
   console.log(
     `[Parser] SonFile: ${trackSlots.length} track slots, ` +
       `${playableSlots} with MIDI events, ${totalEvents} total events, ` +
-      `${songData.patterns.length} patterns, ${header.tempo} BPM`
+      `${songData.patterns.length} patterns, ${header.tempo} BPM`,
   );
 
   return sonFile;
@@ -150,22 +149,22 @@ function parseHeader(data: Uint8Array, view: DataView): SonHeader {
     const offset = INSTRUMENT_NAMES_OFFSET + i * INSTRUMENT_NAME_LENGTH;
     if (offset + INSTRUMENT_NAME_LENGTH > data.length) break;
     instrumentNames.push(
-      decodeAscii(data.slice(offset, offset + INSTRUMENT_NAME_LENGTH))
+      decodeAscii(data.slice(offset, offset + INSTRUMENT_NAME_LENGTH)),
     );
   }
 
   const channelConfig = {
     channels: Array.from(
-      data.slice(CHANNEL_MAP_OFFSET, CHANNEL_MAP_OFFSET + MAX_INSTRUMENTS)
+      data.slice(CHANNEL_MAP_OFFSET, CHANNEL_MAP_OFFSET + MAX_INSTRUMENTS),
     ),
     programs: Array.from(
-      data.slice(PROGRAM_MAP_OFFSET, PROGRAM_MAP_OFFSET + MAX_INSTRUMENTS)
+      data.slice(PROGRAM_MAP_OFFSET, PROGRAM_MAP_OFFSET + MAX_INSTRUMENTS),
     ),
     volumes: Array.from(
-      data.slice(VOLUME_MAP_OFFSET, VOLUME_MAP_OFFSET + MAX_INSTRUMENTS)
+      data.slice(VOLUME_MAP_OFFSET, VOLUME_MAP_OFFSET + MAX_INSTRUMENTS),
     ),
     pans: Array.from(
-      data.slice(PAN_MAP_OFFSET, PAN_MAP_OFFSET + MAX_INSTRUMENTS)
+      data.slice(PAN_MAP_OFFSET, PAN_MAP_OFFSET + MAX_INSTRUMENTS),
     ),
   };
 
@@ -182,17 +181,20 @@ function parseHeader(data: Uint8Array, view: DataView): SonHeader {
     activeTrackMask: view.getUint16(0x000e, false),
     displayMode: data[0x0010] ?? 0,
     rawExtended: new Uint8Array(
-      data.slice(EXTENDED_HEADER_OFFSET, EXTENDED_HEADER_OFFSET + EXTENDED_HEADER_SIZE)
+      data.slice(
+        EXTENDED_HEADER_OFFSET,
+        EXTENDED_HEADER_OFFSET + EXTENDED_HEADER_SIZE,
+      ),
     ),
   };
 
   // ─── Track group mapping (0x0330–0x036F) ─────────────────────────
   const trackGroups: TrackGroupMapping = {
     groups: Array.from(
-      data.slice(TRACK_GROUP_OFFSET, TRACK_GROUP_OFFSET + MAX_INSTRUMENTS)
+      data.slice(TRACK_GROUP_OFFSET, TRACK_GROUP_OFFSET + MAX_INSTRUMENTS),
     ),
     rawGroupData: new Uint8Array(
-      data.slice(TRACK_GROUP_OFFSET, TRACK_GROUP_OFFSET + TRACK_GROUP_SIZE)
+      data.slice(TRACK_GROUP_OFFSET, TRACK_GROUP_OFFSET + TRACK_GROUP_SIZE),
     ),
   };
 
@@ -229,11 +231,11 @@ function parseTrackSlot(chunk: Uint8Array): TrackSlot {
   const rawHeader = chunk.slice(0, TRACK_HEADER_SIZE);
   const rawName = chunk.slice(
     TRACK_HEADER_SIZE,
-    TRACK_HEADER_SIZE + TRACK_NAME_SIZE
+    TRACK_HEADER_SIZE + TRACK_NAME_SIZE,
   );
   const rawConfig = chunk.slice(
     TRACK_HEADER_SIZE + TRACK_NAME_SIZE,
-    TRACK_PREAMBLE
+    TRACK_PREAMBLE,
   );
   const eventData = chunk.slice(TRACK_PREAMBLE);
 
@@ -248,7 +250,7 @@ function parseTrackSlot(chunk: Uint8Array): TrackSlot {
       e.type === "control_change" ||
       e.type === "program_change" ||
       e.type === "pitch_wheel" ||
-      e.type === "sysex"
+      e.type === "sysex",
   );
 
   return {
@@ -481,7 +483,7 @@ function parseAllEvents(data: Uint8Array): SonEvent[] {
           ci++;
           const cOffset = ci * EVENT_SIZE;
           const cRaw = new Uint8Array(
-            data.slice(cOffset, cOffset + EVENT_SIZE)
+            data.slice(cOffset, cOffset + EVENT_SIZE),
           );
           rawRecords.push(cRaw);
 
@@ -529,7 +531,7 @@ function parseAllEvents(data: Uint8Array): SonEvent[] {
 
 function splitOnBoundariesWithInfo(
   data: Uint8Array,
-  startOffset: number
+  startOffset: number,
 ): {
   chunks: Uint8Array[];
   boundaries: BoundaryInfo[];
@@ -550,18 +552,16 @@ function splitOnBoundariesWithInfo(
   }
 
   // Capture data before the first boundary (pre-boundary padding)
-  const firstBoundaryPos = positions.length > 0 ? positions[0].pos : region.length;
-  const preBoundaryPadding = new Uint8Array(
-    region.slice(0, firstBoundaryPos)
-  );
+  const firstBoundaryPos =
+    positions.length > 0 ? positions[0].pos : region.length;
+  const preBoundaryPadding = new Uint8Array(region.slice(0, firstBoundaryPos));
 
   for (let i = 0; i < positions.length; i++) {
     const { pos, type } = positions[i];
     boundaries.push({ type, fileOffset: startOffset + pos });
 
     const start = pos + 4;
-    const end =
-      i + 1 < positions.length ? positions[i + 1].pos : region.length;
+    const end = i + 1 < positions.length ? positions[i + 1].pos : region.length;
     if (end > start) {
       chunks.push(region.slice(start, end));
     } else {
@@ -598,7 +598,7 @@ function buildSongData(
   header: SonHeader,
   trackSlots: TrackSlot[],
   data: Uint8Array,
-  view: DataView
+  view: DataView,
 ): SongData {
   // Build Track[] from playable TrackSlots
   const allTracks: (Track | null)[] = trackSlots.map((slot, index) => {
@@ -614,7 +614,7 @@ function buildSongData(
         e.type === "program_change" ||
         e.type === "channel_pressure" ||
         e.type === "pitch_wheel" ||
-        e.type === "sysex"
+        e.type === "sysex",
     );
 
     if (midiEvents.length === 0) return null;
@@ -635,9 +635,7 @@ function buildSongData(
     }
 
     const isDrums =
-      channel === 9 ||
-      /drum|percuss/i.test(slot.name) ||
-      slotInPattern === 9;
+      channel === 9 || /drum|percuss/i.test(slot.name) || slotInPattern === 9;
 
     return {
       name: slot.name,
@@ -666,7 +664,12 @@ function buildSongData(
     let patternName = `Pattern ${p + 1}`;
     for (let t = 0; t < TRACKS_PER_PATTERN; t++) {
       const slot = trackSlots[startSlot + t];
-      if (slot && slot.name && slot.name.trim() && slot.name.trim() !== "Name") {
+      if (
+        slot &&
+        slot.name &&
+        slot.name.trim() &&
+        slot.name.trim() !== "Name"
+      ) {
         patternName = slot.name.trim();
         break;
       }
@@ -686,7 +689,12 @@ function buildSongData(
   }
 
   // Parse arrangement (pass patterns so we can reference their names)
-  const arrangement = parseArrangement(data, view, patterns, header.ticksPerMeasure);
+  const arrangement = parseArrangement(
+    data,
+    view,
+    patterns,
+    header.ticksPerMeasure,
+  );
 
   const activePatternIndex = 0;
   const activePattern = patterns[activePatternIndex];
@@ -696,14 +704,14 @@ function buildSongData(
   console.log(
     `[Parser] ${patterns.length} patterns, ` +
       `active pattern has ${activeTracks.length} tracks, ` +
-      `${totalTicks} ticks, ${arrangement.length} arrangement entries`
+      `${totalTicks} ticks, ${arrangement.length} arrangement entries`,
   );
 
   for (const t of activeTracks) {
     const noteOns = t.events.filter((e) => e.type === "note_on").length;
     const noteOffs = t.events.filter((e) => e.type === "note_off").length;
     console.log(
-      `  [Parser] Track "${t.name}" ch=${t.channel}: ${noteOns} note_on, ${noteOffs} note_off`
+      `  [Parser] Track "${t.name}" ch=${t.channel}: ${noteOns} note_on, ${noteOffs} note_off`,
     );
   }
 
@@ -744,22 +752,22 @@ function parseArrangement(
   data: Uint8Array,
   view: DataView,
   patterns: Pattern[],
-  ticksPerMeasure: number
+  ticksPerMeasure: number,
 ): ArrangementEntry[] {
   const entries: ArrangementEntry[] = [];
 
   // ── Read F0 entries (arrangement start markers) ─────────────
   const F0_START = ARRANGE_OFFSET + 0x18; // 0x0388
-  const F0_END = ARRANGE_OFFSET + 0x40;   // 0x03B0
+  const F0_END = ARRANGE_OFFSET + 0x40; // 0x03B0
   const f0Values: number[] = [];
 
   for (let off = F0_START; off < F0_END; off += 4) {
     if (off + 4 > data.length) break;
     const val = view.getUint32(off, false);
     if (val === 0) break;
-    const marker = val & 0xFF;
-    if (marker !== 0xF0) break;
-    const refByte = (val >> 8) & 0xFF;
+    const marker = val & 0xff;
+    if (marker !== 0xf0) break;
+    const refByte = (val >> 8) & 0xff;
     f0Values.push(refByte);
   }
 
@@ -768,7 +776,10 @@ function parseArrangement(
     let bar = 1;
     for (const pat of patterns) {
       if (pat.tracks.length === 0) continue;
-      const barLength = Math.max(1, Math.ceil(pat.totalTicks / ticksPerMeasure));
+      const barLength = Math.max(
+        1,
+        Math.ceil(pat.totalTicks / ticksPerMeasure),
+      );
       entries.push({
         patternIndex: pat.index,
         bar,
@@ -782,16 +793,16 @@ function parseArrangement(
 
   // ── Read EF entries (arrangement end markers) ───────────────
   const EF_START = ARRANGE_OFFSET + 0x40; // 0x03B0
-  const EF_END = ARRANGE_OFFSET + 0x68;   // 0x03D8
+  const EF_END = ARRANGE_OFFSET + 0x68; // 0x03D8
   const efValues: number[] = [];
 
   for (let off = EF_START; off < EF_END; off += 4) {
     if (off + 4 > data.length) break;
     const val = view.getUint32(off, false);
     if (val === 0) break;
-    const marker = val & 0xFF;
-    if (marker !== 0xEF) break;
-    const refByte = (val >> 8) & 0xFF;
+    const marker = val & 0xff;
+    if (marker !== 0xef) break;
+    const refByte = (val >> 8) & 0xff;
     efValues.push(refByte);
   }
 
@@ -830,7 +841,7 @@ function parseArrangement(
 
   console.log(
     `[Parser] Arrangement: ${entries.length} entries, ` +
-      `${currentBar - 1} total bars`
+      `${currentBar - 1} total bars`,
   );
 
   return entries;

@@ -29,6 +29,8 @@ interface TransportBarProps {
 
 /** Demo .SON files for the File menu */
 const DEMO_FILES = [
+  { name: "ALEXA'S.SON", path: "/demos/ALEXA'S.SON" },
+  { name: "AUTOLOAD.SON", path: "/demos/AUTOLOAD.SON" },
   { name: "EXAMPLE.SON", path: "/demos/EXAMPLE.SON" },
   { name: "DRUMMAP.SON", path: "/demos/DRUMMAP.SON" },
   { name: "POLYPHON.SON", path: "/demos/POLYPHON.SON" },
@@ -161,7 +163,7 @@ export function TransportBar({
         ],
       },
     ],
-    [onLoadFileClick, onDemoLoad, onExportMidi, loopEnabled, onToggleLoop]
+    [onLoadFileClick, onDemoLoad, onExportMidi, loopEnabled, onToggleLoop],
   );
 
   return (
@@ -267,9 +269,7 @@ export function TransportBar({
                   : "bg-notator-text-dim"
               }`}
             />
-            <span className="text-notator-text-dim uppercase">
-              {state}
-            </span>
+            <span className="text-notator-text-dim uppercase">{state}</span>
           </div>
         </div>
 

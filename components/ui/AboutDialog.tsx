@@ -42,10 +42,7 @@ export function AboutDialog({ open, onClose }: AboutDialogProps) {
       aria-modal="true"
       aria-label="About Notator Web"
     >
-      <div
-        className="notator-dialog"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="notator-dialog" onClick={(e) => e.stopPropagation()}>
         {/* Title bar — GEM style */}
         <div className="notator-dialog-titlebar">
           <span className="flex-1 text-center font-bold tracking-wider">
@@ -68,7 +65,9 @@ export function AboutDialog({ open, onClose }: AboutDialogProps) {
               N O T A T O R
             </div>
             <div className="flex items-center justify-center gap-2">
-              <span className="text-sm font-bold text-notator-accent">3.21</span>
+              <span className="text-sm font-bold text-notator-accent">
+                3.21
+              </span>
               <span className="text-notator-text-dim">web</span>
             </div>
             <div className="text-[10px] text-notator-text-muted mt-2">
@@ -112,9 +111,14 @@ export function AboutDialog({ open, onClose }: AboutDialogProps) {
                         {credit.name}
                       </a>
                     ) : (
-                      <span className="font-bold text-notator-text">{credit.name}</span>
+                      <span className="font-bold text-notator-text">
+                        {credit.name}
+                      </span>
                     )}
-                    <span className="text-notator-text-muted"> — {credit.desc}</span>
+                    <span className="text-notator-text-muted">
+                      {" "}
+                      — {credit.desc}
+                    </span>
                   </div>
                 </div>
               ))}
