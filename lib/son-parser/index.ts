@@ -28,8 +28,11 @@ import type {
   SonEvent,
   TrackSlot,
   TrackConfig,
+  HeaderConfig,
+  TrackGroupMapping,
   BoundaryInfo,
   Pattern,
+  ArrangementEntry,
 } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -50,9 +53,16 @@ const PROGRAM_MAP_OFFSET = 0x0340;
 const VOLUME_MAP_OFFSET = 0x0350;
 const PAN_MAP_OFFSET = 0x0360;
 
+/** Extended header region */
+const EXTENDED_HEADER_OFFSET = 0x0008;
+const EXTENDED_HEADER_SIZE = 26; // 0x0008–0x0021
+
+/** Track group mapping region */
+const TRACK_GROUP_OFFSET = 0x0330;
+const TRACK_GROUP_SIZE = 64; // 0x0330–0x036F (only first 16 bytes used for mapping)
+
 /** Arrangement region */
 const ARRANGE_OFFSET = 0x0370;
-const ARRANGE_SIZE = 0x190;
 
 /** Boundary markers */
 const BOUNDARY_A = [0x7f, 0xff, 0xff, 0xff] as const;
@@ -159,6 +169,33 @@ function parseHeader(data: Uint8Array, view: DataView): SonHeader {
     ),
   };
 
+  // ─── Extended header config (0x0008–0x0021) ──────────────────────
+  const flagsByte = data[0x000a] ?? 0;
+  const headerConfig: HeaderConfig = {
+    quantizeValue: view.getUint16(EXTENDED_HEADER_OFFSET, false),
+    loopEnabled: (flagsByte & 0x01) !== 0,
+    autoQuantize: (flagsByte & 0x02) !== 0,
+    flagsByte,
+    clickTrack: (data[0x000b] ?? 0) !== 0,
+    metronomePrescale: data[0x000c] ?? 0,
+    precountBars: data[0x000d] ?? 0,
+    activeTrackMask: view.getUint16(0x000e, false),
+    displayMode: data[0x0010] ?? 0,
+    rawExtended: new Uint8Array(
+      data.slice(EXTENDED_HEADER_OFFSET, EXTENDED_HEADER_OFFSET + EXTENDED_HEADER_SIZE)
+    ),
+  };
+
+  // ─── Track group mapping (0x0330–0x036F) ─────────────────────────
+  const trackGroups: TrackGroupMapping = {
+    groups: Array.from(
+      data.slice(TRACK_GROUP_OFFSET, TRACK_GROUP_OFFSET + MAX_INSTRUMENTS)
+    ),
+    rawGroupData: new Uint8Array(
+      data.slice(TRACK_GROUP_OFFSET, TRACK_GROUP_OFFSET + TRACK_GROUP_SIZE)
+    ),
+  };
+
   return {
     magic,
     tempo,
@@ -166,6 +203,8 @@ function parseHeader(data: Uint8Array, view: DataView): SonHeader {
     ticksPerBeat,
     instrumentNames,
     channelConfig,
+    headerConfig,
+    trackGroups,
   };
 }
 
@@ -561,8 +600,6 @@ function buildSongData(
   data: Uint8Array,
   view: DataView
 ): SongData {
-  const arrangement = parseArrangement(data, view);
-
   // Build Track[] from playable TrackSlots
   const allTracks: (Track | null)[] = trackSlots.map((slot, index) => {
     if (!slot.hasPlayableEvents) return null;
@@ -607,11 +644,12 @@ function buildSongData(
       channel: isDrums ? 9 : channel,
       header: slot.rawHeader,
       config: slot.rawConfig,
+      trackConfig: slot.config,
       events: midiEvents,
     };
   });
 
-  // Group into patterns
+  // Group into patterns (ALL patterns, including empty ones)
   const patterns: Pattern[] = [];
   const numPatterns = Math.ceil(allTracks.length / TRACKS_PER_PATTERN);
 
@@ -624,7 +662,15 @@ function buildSongData(
       if (track) patternTracks.push(track);
     }
 
-    if (patternTracks.length === 0) continue;
+    // Derive a name from the first named track in this pattern
+    let patternName = `Pattern ${p + 1}`;
+    for (let t = 0; t < TRACKS_PER_PATTERN; t++) {
+      const slot = trackSlots[startSlot + t];
+      if (slot && slot.name && slot.name.trim() && slot.name.trim() !== "Name") {
+        patternName = slot.name.trim();
+        break;
+      }
+    }
 
     const totalTicks = patternTracks.reduce((max, track) => {
       const last = track.events[track.events.length - 1];
@@ -633,11 +679,14 @@ function buildSongData(
 
     patterns.push({
       index: p,
-      name: `Pattern ${p + 1}`,
+      name: patternName,
       tracks: patternTracks,
       totalTicks,
     });
   }
+
+  // Parse arrangement (pass patterns so we can reference their names)
+  const arrangement = parseArrangement(data, view, patterns, header.ticksPerMeasure);
 
   const activePatternIndex = 0;
   const activePattern = patterns[activePatternIndex];
@@ -647,7 +696,7 @@ function buildSongData(
   console.log(
     `[Parser] ${patterns.length} patterns, ` +
       `active pattern has ${activeTracks.length} tracks, ` +
-      `${totalTicks} ticks`
+      `${totalTicks} ticks, ${arrangement.length} arrangement entries`
   );
 
   for (const t of activeTracks) {
@@ -669,6 +718,8 @@ function buildSongData(
     instrumentNames: header.instrumentNames,
     tempo: header.tempo,
     channelConfig: header.channelConfig,
+    headerConfig: header.headerConfig,
+    trackGroups: header.trackGroups,
   };
 }
 
@@ -676,25 +727,111 @@ function buildSongData(
 // ARRANGEMENT PARSING
 // ═══════════════════════════════════════════════════════════════════════
 
+/**
+ * Parse the arrangement region at 0x0370.
+ *
+ * Layout (400 bytes total):
+ *   0x0370–0x0371: Total bar count (big-endian uint16)
+ *   0x0386–0x0387: Config/count byte
+ *   0x0388–0x03AF: F0 entries — start of each arrangement section (4 bytes: 00 00 XX F0)
+ *   0x03B0–0x03D7: EF entries — end of each arrangement section   (4 bytes: 00 00 XX EF)
+ *
+ * The value byte XX encodes a pattern reference. Consecutive entries differ by 12,
+ * with (XX ÷ 12 - 2) giving the 0-based pattern index for most entries.
+ * Bar lengths are derived from the difference between corresponding EF and F0 values.
+ */
 function parseArrangement(
   data: Uint8Array,
-  view: DataView
-): { patternIndex: number; bar: number }[] {
-  const entries: { patternIndex: number; bar: number }[] = [];
-  const regionStart = ARRANGE_OFFSET + 0x16;
-  const regionEnd = Math.min(ARRANGE_OFFSET + ARRANGE_SIZE, data.length);
+  view: DataView,
+  patterns: Pattern[],
+  ticksPerMeasure: number
+): ArrangementEntry[] {
+  const entries: ArrangementEntry[] = [];
 
-  for (let off = regionStart; off < regionEnd - 4; off += 4) {
+  // ── Read F0 entries (arrangement start markers) ─────────────
+  const F0_START = ARRANGE_OFFSET + 0x18; // 0x0388
+  const F0_END = ARRANGE_OFFSET + 0x40;   // 0x03B0
+  const f0Values: number[] = [];
+
+  for (let off = F0_START; off < F0_END; off += 4) {
+    if (off + 4 > data.length) break;
     const val = view.getUint32(off, false);
-    if (val === 0) continue;
-
-    if ((val & 0xff) === 0xf0 && val > 0x1000 && val < 0x10000) {
-      entries.push({
-        patternIndex: entries.length,
-        bar: entries.length,
-      });
-    }
+    if (val === 0) break;
+    const marker = val & 0xFF;
+    if (marker !== 0xF0) break;
+    const refByte = (val >> 8) & 0xFF;
+    f0Values.push(refByte);
   }
+
+  if (f0Values.length === 0) {
+    // No arrangement data — create a simple 1-entry-per-pattern arrangement
+    let bar = 1;
+    for (const pat of patterns) {
+      if (pat.tracks.length === 0) continue;
+      const barLength = Math.max(1, Math.ceil(pat.totalTicks / ticksPerMeasure));
+      entries.push({
+        patternIndex: pat.index,
+        bar,
+        length: barLength,
+        name: pat.name,
+      });
+      bar += barLength;
+    }
+    return entries;
+  }
+
+  // ── Read EF entries (arrangement end markers) ───────────────
+  const EF_START = ARRANGE_OFFSET + 0x40; // 0x03B0
+  const EF_END = ARRANGE_OFFSET + 0x68;   // 0x03D8
+  const efValues: number[] = [];
+
+  for (let off = EF_START; off < EF_END; off += 4) {
+    if (off + 4 > data.length) break;
+    const val = view.getUint32(off, false);
+    if (val === 0) break;
+    const marker = val & 0xFF;
+    if (marker !== 0xEF) break;
+    const refByte = (val >> 8) & 0xFF;
+    efValues.push(refByte);
+  }
+
+  // ── Decode arrangement entries ──────────────────────────────
+  // Find the base value to calculate pattern indices.
+  // The sorted F0 values increment by 12 from the smallest.
+  const sortedF0 = [...f0Values].sort((a, b) => a - b);
+  const baseValue = sortedF0[0]; // smallest F0 value
+
+  let currentBar = 1;
+
+  for (let i = 0; i < f0Values.length; i++) {
+    const f0 = f0Values[i];
+    const ef = i < efValues.length ? efValues[i] : f0 + 12;
+
+    // Calculate bar length from EF - F0 difference
+    const barLength = Math.max(1, ef - f0);
+
+    // Calculate pattern index: (value - base) / 12
+    const rawIndex = Math.round((f0 - baseValue) / 12);
+    const patternIndex = Math.max(0, Math.min(rawIndex, patterns.length - 1));
+
+    // Use the pattern name if available
+    const pattern = patterns[patternIndex];
+    const name = pattern ? pattern.name : `Pattern ${patternIndex + 1}`;
+
+    entries.push({
+      patternIndex,
+      bar: currentBar,
+      length: barLength,
+      name,
+    });
+
+    currentBar += barLength;
+  }
+
+  console.log(
+    `[Parser] Arrangement: ${entries.length} entries, ` +
+      `${currentBar - 1} total bars`
+  );
 
   return entries;
 }

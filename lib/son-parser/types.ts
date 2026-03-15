@@ -44,6 +44,44 @@ export interface SonFile {
   songData: SongData;
 }
 
+/**
+ * Extended header config parsed from 0x0008–0x0021.
+ * These fields control quantize, loop, click, and metronome behaviour.
+ */
+export interface HeaderConfig {
+  /** Quantize grid resolution (uint16 @ 0x0008) */
+  quantizeValue: number;
+  /** Loop mode flag (bit 0 @ 0x000A) */
+  loopEnabled: boolean;
+  /** Auto-quantize flag (bit 1 @ 0x000A) */
+  autoQuantize: boolean;
+  /** Raw flag byte @ 0x000A for any un-decoded bits */
+  flagsByte: number;
+  /** Click track on/off (byte @ 0x000B, nonzero = on) */
+  clickTrack: boolean;
+  /** Metronome prescale (byte @ 0x000C) */
+  metronomePrescale: number;
+  /** Precount bars (byte @ 0x000D) */
+  precountBars: number;
+  /** Active track bitmask — 16 bits, one per track (uint16 @ 0x000E) */
+  activeTrackMask: number;
+  /** Notation display mode (byte @ 0x0010) */
+  displayMode: number;
+  /** Full raw bytes for round-trip (26 bytes: 0x0008–0x0021) */
+  rawExtended: Uint8Array;
+}
+
+/**
+ * Track-to-group mapping parsed from 0x0330–0x036F.
+ * 16 bytes at 0x0330 assign each track to a numbered group.
+ */
+export interface TrackGroupMapping {
+  /** 16-element array: groups[trackIndex] = group number */
+  groups: number[];
+  /** Full raw 64-byte region for round-trip */
+  rawGroupData: Uint8Array;
+}
+
 /** Parsed header fields from the raw header */
 export interface SonHeader {
   /** Bytes at 0x0000-0x0001 (typically 0x3B9E in files) */
@@ -58,6 +96,10 @@ export interface SonHeader {
   instrumentNames: string[];
   /** MIDI channel configuration */
   channelConfig: ChannelConfig;
+  /** Extended header config (0x0008–0x0021) */
+  headerConfig: HeaderConfig;
+  /** Track group mapping (0x0330–0x036F) */
+  trackGroups: TrackGroupMapping;
 }
 
 /** Boundary marker metadata */
@@ -131,11 +173,21 @@ export interface SongData {
   instrumentNames: string[];
   tempo: number;
   channelConfig: ChannelConfig;
+  /** Extended header config (quantize, loop, click, etc.) */
+  headerConfig: HeaderConfig;
+  /** Track-to-group mapping */
+  trackGroups: TrackGroupMapping;
 }
 
 export interface ArrangementEntry {
+  /** 0-based pattern index this entry references */
   patternIndex: number;
+  /** Starting bar number (1-based, for display) */
   bar: number;
+  /** Length of this entry in bars */
+  length: number;
+  /** Display name (pattern name or "Pattern N") */
+  name: string;
 }
 
 export interface Pattern {
@@ -158,6 +210,8 @@ export interface Track {
   channel: number;
   header: Uint8Array;
   config?: Uint8Array;
+  /** Parsed track config (filters, port, note range) */
+  trackConfig?: TrackConfig;
   events: TrackEvent[];
 }
 

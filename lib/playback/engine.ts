@@ -51,6 +51,7 @@ export class PlaybackEngine {
 
   // Arrangement / pattern sequencing
   private currentPatternIndex: number = 0;
+  private loopEnabled: boolean = false;
 
   // Mute/Solo
   private mutedTracks: Set<number> = new Set();
@@ -86,6 +87,16 @@ export class PlaybackEngine {
   setTempo(bpm: number): void {
     if (bpm < 20 || bpm > 300) return;
     this.tempo = bpm;
+  }
+
+  /** Set loop mode */
+  setLoop(enabled: boolean): void {
+    this.loopEnabled = enabled;
+  }
+
+  /** Get loop mode */
+  getLoop(): boolean {
+    return this.loopEnabled;
   }
 
   /** Toggle mute for a track */
@@ -227,11 +238,15 @@ export class PlaybackEngine {
   private advanceToNextPattern(): boolean {
     if (!this.song) return false;
 
-    const nextIndex = this.currentPatternIndex + 1;
+    let nextIndex = this.currentPatternIndex + 1;
 
     // Check if there are more patterns
     if (nextIndex >= this.song.patterns.length) {
-      return false;
+      if (this.loopEnabled) {
+        nextIndex = 0; // Loop back to first pattern
+      } else {
+        return false;
+      }
     }
 
     const nextPattern = this.song.patterns[nextIndex];

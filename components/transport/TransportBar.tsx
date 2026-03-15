@@ -12,10 +12,13 @@ interface TransportBarProps {
   totalTicks: number;
   tempo: number;
   songName: string;
+  ticksPerMeasure: number;
+  loopEnabled: boolean;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
   onTempoChange: (bpm: number) => void;
+  onToggleLoop: () => void;
   /** Trigger native file picker for .SON loading */
   onLoadFileClick?: () => void;
   /** Load a demo .SON by path and name */
@@ -45,14 +48,21 @@ export function TransportBar({
   totalTicks,
   tempo,
   songName,
+  ticksPerMeasure,
+  loopEnabled,
   onPlay,
   onPause,
   onStop,
   onTempoChange,
+  onToggleLoop,
   onLoadFileClick,
   onDemoLoad,
 }: TransportBarProps) {
   const [aboutOpen, setAboutOpen] = useState(false);
+
+  // Derive time signature from ticks per measure
+  const beatsPerBar = Math.round(ticksPerMeasure / 192);
+  const timeSigDisplay = ticksPerMeasure > 0 ? `${beatsPerBar}/4` : "4/4";
 
   const menus: MenuDefinition[] = useMemo(
     () => [
@@ -108,7 +118,10 @@ export function TransportBar({
       {
         label: "Flags",
         items: [
-          { label: "Loop", disabled: true },
+          {
+            label: loopEnabled ? "✓ Loop" : "Loop",
+            onClick: onToggleLoop,
+          },
           { label: "Auto-Advance", disabled: true },
         ],
       },
@@ -138,7 +151,7 @@ export function TransportBar({
         ],
       },
     ],
-    [onLoadFileClick, onDemoLoad]
+    [onLoadFileClick, onDemoLoad, loopEnabled, onToggleLoop]
   );
 
   return (
@@ -194,7 +207,7 @@ export function TransportBar({
         {/* Time signature */}
         <div className="rounded border border-notator-border bg-notator-bg px-2 py-0.5 text-[10px]">
           <span className="text-notator-text-dim">SIG</span>{" "}
-          <span className="font-bold text-notator-text">4/4</span>
+          <span className="font-bold text-notator-text">{timeSigDisplay}</span>
         </div>
 
         {/* Spacer */}

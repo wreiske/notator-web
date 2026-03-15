@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, type ChangeEvent } from "reac
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { TransportBar } from "@/components/transport/TransportBar";
 import { TrackList } from "@/components/tracks/TrackList";
+import { NotationTimeline } from "@/components/tracks/NotationTimeline";
 import { parseSonFile } from "@/lib/son-parser";
 import type { SonFile, SongData, Track } from "@/lib/son-parser/types";
 import { PlaybackEngine } from "@/lib/playback/engine";
@@ -42,6 +43,8 @@ export default function PlayerPage() {
   const [activeTrackIndices, setActiveTrackIndices] = useState<Set<number>>(new Set());
   const [activePatternIndex, setActivePatternIndex] = useState(0);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState(0);
+  const [loopEnabled, setLoopEnabled] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(true);
 
   // Refs
   const engineRef = useRef<PlaybackEngine | null>(null);
@@ -164,6 +167,15 @@ export default function PlayerPage() {
     engineRef.current?.setTempo(bpm);
   }, []);
 
+  // Toggle loop mode
+  const handleToggleLoop = useCallback(() => {
+    setLoopEnabled(prev => {
+      const next = !prev;
+      engineRef.current?.setLoop(next);
+      return next;
+    });
+  }, []);
+
   // Switch active pattern
   const handlePatternChange = useCallback(
     (patternIndex: number) => {
@@ -249,10 +261,13 @@ export default function PlayerPage() {
           totalTicks={0}
           tempo={tempo}
           songName=""
+          ticksPerMeasure={768}
+          loopEnabled={loopEnabled}
           onPlay={handlePlay}
           onPause={handlePause}
           onStop={handleStop}
           onTempoChange={handleTempoChange}
+          onToggleLoop={handleToggleLoop}
           onLoadFileClick={handleLoadFileClick}
           onDemoLoad={handleDemoLoad}
         />
@@ -321,23 +336,27 @@ export default function PlayerPage() {
         totalTicks={song.totalTicks}
         tempo={tempo}
         songName={songName}
+        ticksPerMeasure={song.ticksPerMeasure}
+        loopEnabled={loopEnabled}
         onPlay={handlePlay}
         onPause={handlePause}
         onStop={handleStop}
         onTempoChange={handleTempoChange}
+        onToggleLoop={handleToggleLoop}
         onLoadFileClick={handleLoadFileClick}
         onDemoLoad={handleDemoLoad}
       />
 
       {/* 3-Panel body */}
       <div className="flex flex-1 overflow-hidden">
-        {/* ─── LEFT PANEL: ARRANGE (Pattern List) ─── */}
+        {/* ─── LEFT PANEL: ARRANGE (Arrangement List) ─── */}
         <aside className="flex w-52 flex-shrink-0 flex-col border-r border-notator-border-bright bg-notator-panel">
           {/* Panel header */}
           <div className="flex items-center justify-between border-b border-notator-border px-3 py-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-notator-text-dim">
-              Arrange
-            </span>
+            <div className="flex gap-3 text-[10px] font-bold uppercase tracking-widest text-notator-text-dim">
+              <span>Bar</span>
+              <span>Arrange</span>
+            </div>
             <button
               onClick={() => {
                 engineRef.current?.stop();
@@ -351,32 +370,58 @@ export default function PlayerPage() {
             </button>
           </div>
 
-          {/* Pattern list */}
+          {/* Arrangement list */}
           <div className="flex-1 overflow-y-auto">
             <table className="w-full font-mono text-[11px]">
               <tbody>
-                {song.patterns.map((pat, idx) => (
-                  <tr
-                    key={idx}
-                    onClick={() => handlePatternChange(idx)}
-                    className={`cursor-pointer transition-colors ${
-                      idx === activePatternIndex
-                        ? "bg-notator-highlight text-white"
-                        : "text-notator-text hover:bg-notator-surface-hover"
-                    }`}
-                    id={`pattern-row-${idx}`}
-                  >
-                    <td className="w-8 px-2 py-1.5 text-right text-notator-text-muted">
-                      {pat.index + 1}
-                    </td>
-                    <td className="px-2 py-1.5 font-bold">
-                      {pat.name}
-                    </td>
-                    <td className="px-2 py-1.5 text-right text-notator-text-dim">
-                      {pat.tracks.length}
-                    </td>
-                  </tr>
-                ))}
+                {song.arrangement.length > 0 ? (
+                  song.arrangement.map((entry, idx) => (
+                    <tr
+                      key={idx}
+                      onClick={() => handlePatternChange(entry.patternIndex)}
+                      className={`cursor-pointer transition-colors ${
+                        entry.patternIndex === activePatternIndex
+                          ? "bg-notator-highlight text-white"
+                          : "text-notator-text hover:bg-notator-surface-hover"
+                      }`}
+                      id={`arrange-row-${idx}`}
+                    >
+                      <td className="w-8 px-2 py-1.5 text-right text-notator-text-muted">
+                        {entry.bar}
+                      </td>
+                      <td className="px-2 py-1.5 font-bold">
+                        {entry.name}
+                      </td>
+                      <td className="w-6 px-2 py-1.5 text-right text-notator-text-dim">
+                        {entry.patternIndex + 1}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  /* Fallback: show patterns directly if no arrangement */
+                  song.patterns.map((pat, idx) => (
+                    <tr
+                      key={idx}
+                      onClick={() => handlePatternChange(idx)}
+                      className={`cursor-pointer transition-colors ${
+                        idx === activePatternIndex
+                          ? "bg-notator-highlight text-white"
+                          : "text-notator-text hover:bg-notator-surface-hover"
+                      }`}
+                      id={`pattern-row-${idx}`}
+                    >
+                      <td className="w-8 px-2 py-1.5 text-right text-notator-text-muted">
+                        {idx + 1}
+                      </td>
+                      <td className="px-2 py-1.5 font-bold">
+                        {pat.name}
+                      </td>
+                      <td className="w-6 px-2 py-1.5 text-right text-notator-text-dim">
+                        {pat.tracks.length}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -388,9 +433,16 @@ export default function PlayerPage() {
               <span className="text-notator-text-muted">{song.patterns.length}</span>
             </div>
             <div className="flex justify-between">
+              <span>Entries</span>
+              <span className="text-notator-text-muted">{song.arrangement.length}</span>
+            </div>
+            <div className="flex justify-between">
               <span>Bars</span>
               <span className="text-notator-text-muted">
-                {Math.ceil(song.totalTicks / song.ticksPerMeasure)}
+                {song.arrangement.length > 0
+                  ? song.arrangement[song.arrangement.length - 1].bar +
+                    song.arrangement[song.arrangement.length - 1].length - 1
+                  : Math.ceil(song.totalTicks / song.ticksPerMeasure)}
               </span>
             </div>
           </div>
@@ -411,7 +463,20 @@ export default function PlayerPage() {
             </span>
             <span className="text-notator-text-dim">·</span>
             <span className="text-notator-accent">
-              Pattern {activePatternIndex + 1}
+              {song.patterns[activePatternIndex]?.name || `Pattern ${activePatternIndex + 1}`}
+            </span>
+            <span className="ml-auto">
+              <button
+                onClick={() => setShowTimeline(v => !v)}
+                className={`rounded px-2 py-0.5 text-[9px] font-bold ${
+                  showTimeline
+                    ? "bg-notator-accent/20 text-notator-accent"
+                    : "bg-notator-bg/50 text-notator-text-dim"
+                }`}
+                id="toggle-timeline-btn"
+              >
+                {showTimeline ? "▼ SCORE" : "▶ SCORE"}
+              </button>
             </span>
           </div>
 
@@ -464,6 +529,54 @@ export default function PlayerPage() {
                   </div>
                 ))}
 
+                {/* Track config details (MIDI port, filters, note range) */}
+                {selectedTrack.trackConfig && (
+                  <>
+                    <div className="border-t border-notator-border px-3 py-1.5">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-notator-text-dim">
+                        Config
+                      </span>
+                    </div>
+                    {[
+                      { label: "PORT", value: selectedTrack.trackConfig.midiPort > 0 ? String(selectedTrack.trackConfig.midiPort) : "---" },
+                      { label: "NOTE FILT", value: `${selectedTrack.trackConfig.noteRangeLow || "---"}-${selectedTrack.trackConfig.noteRangeHigh || "---"}` },
+                    ].map(({ label, value }) => (
+                      <div
+                        key={label}
+                        className="flex items-center justify-between border-b border-notator-border/30 px-3 py-1"
+                      >
+                        <span className="text-notator-text-dim text-[10px]">{label}</span>
+                        <span className="font-bold tabular-nums text-notator-text text-[10px]">{value}</span>
+                      </div>
+                    ))}
+                    {/* Event type filters */}
+                    <div className="px-3 py-1">
+                      <div className="flex flex-wrap gap-1">
+                        {([
+                          ["NOTE", !selectedTrack.trackConfig.filters.noteFilter],
+                          ["AT", !selectedTrack.trackConfig.filters.aftertouchFilter],
+                          ["CC", !selectedTrack.trackConfig.filters.ccFilter],
+                          ["PC", !selectedTrack.trackConfig.filters.programFilter],
+                          ["CP", !selectedTrack.trackConfig.filters.channelPressureFilter],
+                          ["PW", !selectedTrack.trackConfig.filters.pitchWheelFilter],
+                          ["SX", !selectedTrack.trackConfig.filters.sysexFilter],
+                        ] as [string, boolean][]).map(([label, enabled]) => (
+                          <span
+                            key={label}
+                            className={`rounded px-1 py-0.5 text-[8px] font-bold ${
+                              enabled
+                                ? "bg-notator-accent/20 text-notator-accent"
+                                : "bg-notator-bg/50 text-notator-text-dim line-through"
+                            }`}
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 {/* Mute / Solo controls */}
                 <div className="border-t border-notator-border px-3 py-3">
                   <div className="flex gap-2">
@@ -491,6 +604,51 @@ export default function PlayerPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Channel config overview */}
+                <div className="border-t border-notator-border px-3 py-1.5">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-notator-text-dim">
+                    Channel {(selectedTrack.channel % 16) + 1}
+                  </span>
+                </div>
+                {[
+                  { label: "PROGRAM", value: song.channelConfig.programs[selectedTrack.channel % 16] !== undefined ? String(song.channelConfig.programs[selectedTrack.channel % 16]) : "---" },
+                  { label: "VOLUME", value: song.channelConfig.volumes[selectedTrack.channel % 16] !== undefined ? String(song.channelConfig.volumes[selectedTrack.channel % 16]) : "---" },
+                  { label: "PAN", value: song.channelConfig.pans[selectedTrack.channel % 16] !== undefined ? String(song.channelConfig.pans[selectedTrack.channel % 16]) : "---" },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between border-b border-notator-border/30 px-3 py-1"
+                  >
+                    <span className="text-notator-text-dim text-[10px]">{label}</span>
+                    <span className="font-bold tabular-nums text-notator-text text-[10px]">{value}</span>
+                  </div>
+                ))}
+
+                {/* Song config (from extended header) */}
+                <div className="border-t border-notator-border px-3 py-1.5">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-notator-text-dim">
+                    Song Config
+                  </span>
+                </div>
+                {[
+                  { label: "QUANTIZE", value: String(song.headerConfig.quantizeValue || song.ticksPerMeasure) },
+                  { label: "LOOP", value: song.headerConfig.loopEnabled ? "ON" : "OFF" },
+                  { label: "CLICK", value: song.headerConfig.clickTrack ? "ON" : "OFF" },
+                  { label: "PRECOUNT", value: song.headerConfig.precountBars > 0 ? String(song.headerConfig.precountBars) : "---" },
+                  { label: "GROUP", value: (() => {
+                    const g = song.trackGroups.groups[selectedTrackIndex];
+                    return g !== undefined && g > 0 ? String(g) : "---";
+                  })() },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between border-b border-notator-border/30 px-3 py-1"
+                  >
+                    <span className="text-notator-text-dim text-[10px]">{label}</span>
+                    <span className="font-bold tabular-nums text-notator-text text-[10px]">{value}</span>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="p-3 text-[11px] text-notator-text-dim">
@@ -500,6 +658,21 @@ export default function PlayerPage() {
           </div>
         </aside>
       </div>
+
+      {/* ─── BOTTOM PANEL: NOTATION TIMELINE ─── */}
+      {showTimeline && (
+        <div className="border-t border-notator-border-bright bg-notator-bg">
+          <NotationTimeline
+            tracks={song.tracks}
+            ticksPerMeasure={song.ticksPerMeasure}
+            ticksPerBeat={song.ticksPerBeat}
+            totalTicks={song.totalTicks}
+            currentTick={currentTick}
+            selectedTrackIndex={selectedTrackIndex}
+            isPlaying={playbackState === "playing"}
+          />
+        </div>
+      )}
 
       {/* Error */}
       {error && (
