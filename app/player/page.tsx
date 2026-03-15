@@ -111,7 +111,13 @@ export default function PlayerPage() {
   useEffect(() => {
     const engine = new PlaybackEngine();
     engine.setCallbacks({
-      onStateChange: setPlaybackState,
+      onStateChange: (state: PlaybackState) => {
+        setPlaybackState(state);
+        // Keep editor state in sync
+        if (state === "stopped") setEditorPlaybackState("stopped");
+        else if (state === "playing") setEditorPlaybackState("playing");
+        else if (state === "paused") setEditorPlaybackState("paused");
+      },
       onPositionChange: (tick: number) => {
         setCurrentTick(tick);
         setEditorCurrentTick(tick);
@@ -155,6 +161,32 @@ export default function PlayerPage() {
     return () => engine.destroy();
   }, []);
 
+  // Global keyboard shortcuts (spacebar play/pause, etc.)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if piano roll editor is open (it has its own handler)
+      if (editingTrackIndex !== null) return;
+      // Don't intercept if user is typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        const engine = engineRef.current;
+        if (!engine) return;
+        const state = engine.getState();
+        if (state === "playing") {
+          engine.pause();
+        } else {
+          engine.play();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editingTrackIndex]);
+
   // Load a .SON file
   const handleFileLoad = useCallback(
     (buffer: ArrayBuffer, fileName: string) => {
@@ -176,6 +208,11 @@ export default function PlayerPage() {
           engineRef.current.setTempo(parsed.songData.tempo);
         }
         setTempo(parsed.songData.tempo);
+
+        // Apply loop setting from SON file header
+        const fileLoop = parsed.songData.headerConfig.loopEnabled;
+        setLoopEnabled(fileLoop);
+        engineRef.current?.setLoop(fileLoop);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to parse .SON file",
@@ -258,30 +295,28 @@ export default function PlayerPage() {
     (patternIndex: number) => {
       if (!song || patternIndex < 0 || patternIndex >= song.patterns.length)
         return;
+
+      // Use the engine's setCurrentPattern to properly switch without full stop/reload
+      engineRef.current?.setCurrentPattern(patternIndex);
+
+      // Update UI state
       const pattern = song.patterns[patternIndex];
-
-      engineRef.current?.stop();
-
-      const patternSong: SongData = {
-        ...song,
-        tracks: pattern.tracks,
-        totalTicks: pattern.totalTicks,
-        activePatternIndex: patternIndex,
-      };
-
-      setSong(patternSong);
+      setSong((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tracks: pattern.tracks,
+          totalTicks: pattern.totalTicks,
+          activePatternIndex: patternIndex,
+        };
+      });
       setActivePatternIndex(patternIndex);
       setSelectedTrackIndex(0);
       setMutedTracks(new Set());
       setSoloedTracks(new Set());
       setActiveTrackIndices(new Set());
-
-      if (engineRef.current) {
-        engineRef.current.loadSong(patternSong);
-        engineRef.current.setTempo(tempo);
-      }
     },
-    [song, tempo],
+    [song],
   );
 
   // Jump to a specific arrangement entry
@@ -409,8 +444,6 @@ export default function PlayerPage() {
 
   const handleEditorStop = useCallback(() => {
     engineRef.current?.stop();
-    // Always reset to 0 (double-tap stop resets)
-    engineRef.current?.seekTo(0);
     setEditorPlaybackState("stopped");
     setEditorCurrentTick(0);
   }, []);

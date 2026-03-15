@@ -204,10 +204,16 @@ export class PlaybackEngine {
     await this.synth.init();
 
     if (this.state === "paused") {
+      // Resume from paused position
       this.startTime =
         performance.now() / 1000 - this.ticksToSeconds(this.pausePosition);
+    } else if (this.pausePosition > 0) {
+      // Starting from a seek'd position (user clicked somewhere while stopped)
+      this.startTime =
+        performance.now() / 1000 - this.ticksToSeconds(this.pausePosition);
+      this.resetTrackStateFromTick(this.pausePosition);
     } else {
-      // Starting from the beginning — reload the first arrangement entry
+      // Starting from the very beginning
       if (this.useArrangement && this.currentArrangementIndex !== 0) {
         this.loadArrangementEntry(0);
       } else {
@@ -234,6 +240,7 @@ export class PlaybackEngine {
 
   /** Stop playback and reset to beginning */
   stop(): void {
+    const wasPlaying = this.state === "playing" || this.state === "paused";
     this.state = "stopped";
     this.pausePosition = 0;
     this.callbacks.onStateChange?.("stopped");
@@ -241,12 +248,14 @@ export class PlaybackEngine {
     this.stopScheduler();
     this.silenceAll();
 
-    // Reset to first arrangement entry
-    if (this.useArrangement && this.song) {
-      this.currentArrangementIndex = 0;
-      this.loadArrangementEntry(0);
-    } else {
-      this.resetTrackState();
+    // Only reset arrangement/tracks if we were actually playing
+    if (wasPlaying) {
+      if (this.useArrangement && this.song) {
+        this.currentArrangementIndex = 0;
+        this.loadArrangementEntry(0);
+      } else {
+        this.resetTrackState();
+      }
     }
   }
 
@@ -277,9 +286,56 @@ export class PlaybackEngine {
     }
   }
 
+  /**
+   * Switch to a specific pattern (for non-arrangement mode).
+   * Loads the pattern's tracks without resetting the entire engine.
+   */
+  setCurrentPattern(patternIndex: number): void {
+    if (!this.song) return;
+    if (patternIndex < 0 || patternIndex >= this.song.patterns.length) return;
+
+    const wasPlaying = this.state === "playing";
+    this.stopScheduler();
+    this.silenceAll();
+
+    const pattern = this.song.patterns[patternIndex];
+    this.currentPatternIndex = patternIndex;
+    this.currentEntryTotalTicks = pattern.totalTicks;
+
+    // Load the pattern's tracks into the scheduler
+    this.scheduledTracks = pattern.tracks.map((track) => ({
+      events: track.events,
+      nextEventIndex: 0,
+      channel: track.channel,
+    }));
+
+    this.pausePosition = 0;
+    this.callbacks.onPatternChange?.(patternIndex);
+    this.callbacks.onPositionChange?.(0);
+
+    console.log(
+      `[Engine] Switched to pattern ${patternIndex + 1}: ` +
+        `"${pattern.name}" (${pattern.tracks.length} tracks, ${pattern.totalTicks} ticks)`,
+    );
+
+    if (wasPlaying) {
+      this.startTime = performance.now() / 1000;
+      this.state = "playing";
+      this.scheduleLoop();
+    } else {
+      this.state = "stopped";
+      this.callbacks.onStateChange?.("stopped");
+    }
+  }
+
+  /** Get current playback state */
+  getState(): PlaybackState {
+    return this.state;
+  }
+
   /** Get current playback position in ticks */
   getCurrentTick(): number {
-    if (this.state === "stopped") return 0;
+    if (this.state === "stopped") return this.pausePosition;
     if (this.state === "paused") return this.pausePosition;
 
     const elapsed = performance.now() / 1000 - this.startTime;
@@ -550,14 +606,18 @@ export class PlaybackEngine {
     }
   }
 
-  /** Reset track scheduling state */
+  /** Reset track scheduling state — uses the current pattern's tracks */
   private resetTrackState(): void {
     if (!this.song) {
       this.scheduledTracks = [];
       return;
     }
 
-    this.scheduledTracks = this.song.tracks.map((track) => ({
+    // Use current pattern tracks if available, otherwise fall back to song.tracks
+    const pattern = this.song.patterns[this.currentPatternIndex];
+    const tracks = pattern ? pattern.tracks : this.song.tracks;
+
+    this.scheduledTracks = tracks.map((track) => ({
       events: track.events,
       nextEventIndex: 0,
       channel: track.channel,
