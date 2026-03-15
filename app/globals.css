@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/*
+ * Notator SL — Blue Monochrome Theme
+ *
+ * Inspired by the Atari ST GEM desktop environment and
+ * the original C-Lab Notator SL 3.21 blue/white display.
+ */
+
+@theme inline {
+  /* Core blues — derived from the Atari ST Notator palette */
+  --color-notator-bg: #080828;
+  --color-notator-bg-deep: #050520;
+  --color-notator-surface: #0e1647;
+  --color-notator-surface-hover: #132060;
+  --color-notator-surface-active: #1a2a78;
+  --color-notator-panel: #0c1240;
+
+  /* Borders */
+  --color-notator-border: #2a3f99;
+  --color-notator-border-bright: #4466cc;
+
+  /* The iconic blue highlight/selection bar */
+  --color-notator-highlight: #3355cc;
+  --color-notator-highlight-bright: #5577ee;
+  --color-notator-selection: #2244aa;
+
+  /* Text — white/blue spectrum */
+  --color-notator-text: #e8ecff;
+  --color-notator-text-muted: #a0b0dd;
+  --color-notator-text-dim: #6678aa;
+  --color-notator-text-inverse: #080828;
+
+  /* Accent — the bright blue from buttons/active elements */
+  --color-notator-accent: #4488ff;
+  --color-notator-accent-hover: #5599ff;
+
+  /* Status colors */
+  --color-notator-green: #44cc88;
+  --color-notator-red: #ff5566;
+  --color-notator-amber: #ffbb44;
+  --color-notator-cyan: #44ddff;
+
+  /* Transport button colors (from the original) */
+  --color-notator-btn-start: #44cc88;
+  --color-notator-btn-cont: #4488ff;
+  --color-notator-btn-stop: #ff5566;
+  --color-notator-btn-record: #ff4444;
+
+  /* Font */
+  --font-mono: "IBM Plex Mono", "Menlo", "Monaco", "Cascadia Mono", monospace;
+}
+
+/* Base html/body */
+html {
+  background-color: var(--color-notator-bg-deep);
+  color: var(--color-notator-text);
+}
+
+body {
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar — blue themed */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-notator-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-notator-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-notator-highlight);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-notator-highlight);
+  color: var(--color-notator-text);
+}
+
+/* Pixel-perfect borders for the retro feel */
+.notator-panel {
+  border: 1px solid var(--color-notator-border);
+  background-color: var(--color-notator-surface);
+}
+
+/* Inverted selection row (like the original blue highlight bar) */
+.notator-row-active {
+  background-color: var(--color-notator-highlight) !important;
+  color: white !important;
+}
+
+/* Button base for transport buttons */
+.notator-btn {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.notator-btn:active {
+  transform: scale(0.96);
+}
