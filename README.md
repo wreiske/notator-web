@@ -22,7 +22,7 @@ A browser-based player and parser for **Notator SL 3.21** `.SON` files, built wi
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | **Next.js 15** (App Router, static export) |
+| Framework | **Next.js 16** (App Router, static export) |
 | UI | **React 19** + **Tailwind CSS 4** |
 | Audio | **WebAudioFont** (GM SoundFont) + **Web MIDI API** |
 | Parser | TypeScript — complete round-trip `.SON` format |
