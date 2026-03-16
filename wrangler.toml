@@ -6,7 +6,7 @@ pages_build_output_dir = "out"
 [[d1_databases]]
 binding = "DB"
 database_name = "notator-db"
-database_id = "f49b2efb-a1f1-45f7-815a-6bc766fdeb88"
+database_id = "e9903f22-bd89-4832-b27b-7260ed4089f8"
 
 # R2 Storage
 [[r2_buckets]]
