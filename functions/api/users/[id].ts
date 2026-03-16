@@ -5,8 +5,8 @@
  * PATCH /api/users/:id — update own profile (auth required)
  */
 
-import type { Env, UserRecord, UpdateProfileBody } from "../../../lib/types";
-import { jsonResponse, errorResponse } from "../../../lib/types";
+import type { Env, UserRecord, UpdateProfileBody } from "../../lib/types";
+import { jsonResponse, errorResponse } from "../../lib/types";
 
 // ─── GET /api/users/:id ───
 

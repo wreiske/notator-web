@@ -4,8 +4,8 @@
  * GET /api/stats — returns aggregate community statistics
  */
 
-import type { Env } from "../../lib/types";
-import { jsonResponse } from "../../lib/types";
+import type { Env } from "../lib/types";
+import { jsonResponse } from "../lib/types";
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { env } = context;

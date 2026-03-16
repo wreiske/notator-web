@@ -6,8 +6,8 @@
  * DELETE /api/songs/:id   — delete/unpublish song (owner only)
  */
 
-import type { Env, UserRecord, SongRecord } from "../../../lib/types";
-import { jsonResponse, errorResponse } from "../../../lib/types";
+import type { Env, UserRecord, SongRecord } from "../../lib/types";
+import { jsonResponse, errorResponse } from "../../lib/types";
 
 // ─── GET /api/songs/:id ───
 
