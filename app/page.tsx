@@ -6,7 +6,7 @@ import { getCommunityStats, listSongs, type SongPublic } from "@/lib/auth/api";
 import { SongCard } from "@/components/songs/SongCard";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { LoginModal } from "@/components/auth/LoginModal";
-import { UserMenu } from "@/components/auth/UserMenu";
+import { MobileNav } from "@/components/ui/MobileNav";
 
 export default function HomePage() {
   const { isAuthenticated } = useAuth();
@@ -20,11 +20,9 @@ export default function HomePage() {
   const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
-    // Load community stats (fail silently if API not available)
     getCommunityStats()
       .then(setStats)
       .catch(() => {});
-    // Load featured songs
     listSongs({ sort: "top-rated", limit: 6 })
       .then((data) => setFeaturedSongs(data.songs))
       .catch(() => {});
@@ -32,103 +30,59 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-notator-bg-deep font-mono">
-      {/* Navigation */}
-      <nav className="border-b border-notator-border bg-notator-surface/50 px-6 py-2">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🎹</span>
-            <span className="text-sm font-bold text-notator-text">
-              Notator Web
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/player"
-              className="text-[10px] text-notator-text-dim hover:text-notator-accent"
-            >
-              Player
-            </Link>
-            <Link
-              href="/community"
-              className="text-[10px] text-notator-text-dim hover:text-notator-accent"
-            >
-              Community
-            </Link>
-            {isAuthenticated && (
-              <Link
-                href="/files"
-                className="text-[10px] text-notator-text-dim hover:text-notator-accent"
-              >
-                My Files
-              </Link>
-            )}
-            <a
-              href="https://github.com/wreiske/notator"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-notator-text-dim hover:text-notator-accent"
-            >
-              GitHub
-            </a>
-            <UserMenu onLoginClick={() => setShowLogin(true)} />
-          </div>
-        </div>
-      </nav>
+      <MobileNav onLoginClick={() => setShowLogin(true)} activePage="home" />
 
-      {/* Hero */}
       <main className="flex flex-1 flex-col">
-        <section className="flex flex-col items-center justify-center px-4 py-20">
+        {/* Hero */}
+        <section className="flex flex-col items-center justify-center px-4 py-12 sm:py-20">
           <div className="max-w-2xl text-center">
-            {/* Logo */}
-            <div className="mb-8 inline-flex items-center gap-3 rounded border border-notator-border-bright bg-notator-surface px-6 py-3">
+            <div className="mb-6 inline-flex items-center gap-3 rounded border border-notator-border-bright bg-notator-surface px-5 py-2.5 sm:mb-8 sm:px-6 sm:py-3">
               <div className="flex h-10 w-10 items-center justify-center rounded bg-notator-highlight/20 text-2xl">
                 🎹
               </div>
               <div className="text-left">
-                <h1 className="text-lg font-bold tracking-tight text-notator-text">
+                <h1 className="text-base font-bold tracking-tight text-notator-text sm:text-lg">
                   Notator Web
                 </h1>
-                <p className="text-[10px] uppercase tracking-widest text-notator-text-dim">
+                <p className="text-[9px] uppercase tracking-widest text-notator-text-dim sm:text-[10px]">
                   Community Edition
                 </p>
               </div>
             </div>
 
-            {/* Tagline */}
-            <h2 className="mb-4 text-4xl font-bold tracking-tight text-notator-text sm:text-5xl">
+            <h2 className="mb-4 text-3xl font-bold tracking-tight text-notator-text sm:text-4xl md:text-5xl">
               Archive, Play &amp; Share{" "}
               <span className="text-notator-accent">Atari ST Music</span>
             </h2>
 
-            <p className="mx-auto mb-8 max-w-lg text-base text-notator-text-muted">
+            <p className="mx-auto mb-6 max-w-lg text-sm text-notator-text-muted sm:mb-8 sm:text-base">
               The home for Notator SL{" "}
-              <code className="rounded border border-notator-border bg-notator-surface px-1.5 py-0.5 text-sm text-notator-accent">
+              <code className="rounded border border-notator-border bg-notator-surface px-1.5 py-0.5 text-xs text-notator-accent sm:text-sm">
                 .SON
               </code>{" "}
               files. Play in your browser, upload your collection, and share
               with the community.
             </p>
 
-            {/* CTAs */}
-            <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-3">
               <Link
                 href="/player"
-                className="notator-btn inline-flex h-12 items-center justify-center gap-2 rounded border-notator-accent bg-notator-accent px-8 text-base text-white transition-all hover:bg-notator-accent-hover hover:scale-105 active:scale-95"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-md bg-notator-accent px-6 text-sm font-bold text-white transition-all hover:bg-notator-accent-hover hover:scale-105 active:scale-95 sm:w-auto"
                 id="cta-open-player"
               >
                 <svg
-                  width="18"
-                  height="18"
+                  width="16"
+                  height="16"
                   viewBox="0 0 18 18"
                   fill="currentColor"
                 >
                   <path d="M5 3.5L14.5 9L5 14.5V3.5Z" />
                 </svg>
-                OPEN PLAYER
+                Open Player
               </Link>
               <Link
                 href="/community"
-                className="notator-btn inline-flex h-12 items-center justify-center gap-2 rounded border-notator-border px-8 text-base text-notator-text-muted transition-colors hover:border-notator-accent hover:text-notator-text"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-md border border-notator-border bg-notator-surface px-6 text-sm font-bold text-notator-text-muted transition-colors hover:border-notator-accent hover:text-notator-text sm:w-auto"
                 id="cta-community"
               >
                 🎵 Browse Songs
@@ -136,7 +90,7 @@ export default function HomePage() {
               {!isAuthenticated && (
                 <button
                   onClick={() => setShowLogin(true)}
-                  className="notator-btn inline-flex h-12 items-center justify-center gap-2 rounded border-notator-green/50 px-8 text-base text-notator-green transition-colors hover:border-notator-green hover:bg-notator-green/10"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-md border border-notator-green/30 bg-notator-green/5 px-6 text-sm font-bold text-notator-green transition-colors hover:border-notator-green hover:bg-notator-green/10 sm:w-auto"
                   id="cta-join"
                 >
                   ✨ Join the Community
@@ -147,7 +101,7 @@ export default function HomePage() {
         </section>
 
         {/* Community Stats */}
-        <section className="border-y border-notator-border bg-notator-surface/30 px-4 py-8">
+        <section className="border-y border-notator-border bg-notator-surface/30 px-4 py-6 sm:py-8">
           <div className="mx-auto grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
             {[
               { value: stats.users, label: "Members", icon: "👤" },
@@ -157,10 +111,10 @@ export default function HomePage() {
             ].map(({ value, label, icon }) => (
               <div key={label} className="text-center">
                 <div className="text-lg">{icon}</div>
-                <div className="text-2xl font-bold text-notator-accent">
+                <div className="text-xl font-bold text-notator-accent sm:text-2xl">
                   {value.toLocaleString()}
                 </div>
-                <div className="text-[10px] uppercase tracking-widest text-notator-text-dim">
+                <div className="text-[9px] uppercase tracking-widest text-notator-text-dim sm:text-[10px]">
                   {label}
                 </div>
               </div>
@@ -169,9 +123,9 @@ export default function HomePage() {
         </section>
 
         {/* How It Works */}
-        <section className="px-4 py-16">
+        <section className="px-4 py-12 sm:py-16">
           <div className="mx-auto max-w-3xl">
-            <h3 className="mb-8 text-center text-xs font-bold uppercase tracking-widest text-notator-text-dim">
+            <h3 className="mb-6 text-center text-xs font-bold uppercase tracking-widest text-notator-text-dim sm:mb-8">
               How It Works
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -197,16 +151,16 @@ export default function HomePage() {
               ].map(({ step, icon, title, desc }) => (
                 <div
                   key={step}
-                  className="rounded border border-notator-border bg-notator-surface p-5 transition-colors hover:border-notator-border-bright"
+                  className="rounded border border-notator-border bg-notator-surface p-4 transition-colors hover:border-notator-border-bright sm:p-5"
                 >
                   <div className="mb-1 text-[10px] font-bold text-notator-accent">
                     STEP {step}
                   </div>
-                  <div className="mb-3 text-2xl">{icon}</div>
+                  <div className="mb-2 text-2xl sm:mb-3">{icon}</div>
                   <h4 className="mb-1 text-sm font-bold text-notator-text">
                     {title}
                   </h4>
-                  <p className="text-[11px] leading-relaxed text-notator-text-dim">
+                  <p className="text-xs leading-relaxed text-notator-text-dim">
                     {desc}
                   </p>
                 </div>
@@ -216,12 +170,12 @@ export default function HomePage() {
         </section>
 
         {/* Feature Cards */}
-        <section className="border-t border-notator-border bg-notator-surface/20 px-4 py-16">
+        <section className="border-t border-notator-border bg-notator-surface/20 px-4 py-12 sm:py-16">
           <div className="mx-auto max-w-3xl">
-            <h3 className="mb-8 text-center text-xs font-bold uppercase tracking-widest text-notator-text-dim">
+            <h3 className="mb-6 text-center text-xs font-bold uppercase tracking-widest text-notator-text-dim sm:mb-8">
               Features
             </h3>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
               {[
                 {
                   icon: "📂",
@@ -256,13 +210,13 @@ export default function HomePage() {
               ].map(({ icon, title, desc }) => (
                 <div
                   key={title}
-                  className="rounded border border-notator-border bg-notator-surface p-5 transition-colors hover:border-notator-border-bright"
+                  className="rounded border border-notator-border bg-notator-surface p-4 transition-colors hover:border-notator-border-bright sm:p-5"
                 >
-                  <div className="mb-3 text-2xl">{icon}</div>
+                  <div className="mb-2 text-2xl sm:mb-3">{icon}</div>
                   <h4 className="mb-1 text-sm font-bold text-notator-text">
                     {title}
                   </h4>
-                  <p className="text-[11px] leading-relaxed text-notator-text-dim">
+                  <p className="text-xs leading-relaxed text-notator-text-dim">
                     {desc}
                   </p>
                 </div>
@@ -273,15 +227,15 @@ export default function HomePage() {
 
         {/* Featured Songs */}
         {featuredSongs.length > 0 && (
-          <section className="border-t border-notator-border px-4 py-16">
+          <section className="border-t border-notator-border px-4 py-12 sm:py-16">
             <div className="mx-auto max-w-5xl">
-              <div className="mb-8 flex items-center justify-between">
+              <div className="mb-6 flex items-center justify-between sm:mb-8">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-notator-text-dim">
                   Featured Songs
                 </h3>
                 <Link
                   href="/community"
-                  className="text-[10px] text-notator-accent hover:underline"
+                  className="text-xs text-notator-accent hover:underline"
                 >
                   View all →
                 </Link>
@@ -297,10 +251,10 @@ export default function HomePage() {
 
         {/* Join CTA */}
         {!isAuthenticated && (
-          <section className="border-t border-notator-border bg-notator-surface/30 px-4 py-16">
+          <section className="border-t border-notator-border bg-notator-surface/30 px-4 py-12 sm:py-16">
             <div className="mx-auto max-w-xl text-center">
               <span className="text-4xl">🎹</span>
-              <h3 className="mt-4 text-2xl font-bold text-notator-text">
+              <h3 className="mt-4 text-xl font-bold text-notator-text sm:text-2xl">
                 Join the Notator Community
               </h3>
               <p className="mt-2 text-sm text-notator-text-muted">
@@ -310,12 +264,12 @@ export default function HomePage() {
               </p>
               <button
                 onClick={() => setShowLogin(true)}
-                className="notator-btn mt-6 inline-flex h-12 items-center justify-center gap-2 rounded border-notator-accent bg-notator-accent px-8 text-base text-white transition-all hover:bg-notator-accent-hover hover:scale-105"
+                className="notator-btn mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded border-notator-accent bg-notator-accent px-8 text-sm text-white transition-all hover:bg-notator-accent-hover hover:scale-105 sm:w-auto sm:text-base"
                 id="cta-join-bottom"
               >
                 ✨ Sign Up with Email
               </button>
-              <p className="mt-2 text-[10px] text-notator-text-dim">
+              <p className="mt-2 text-xs text-notator-text-dim">
                 No password needed — we&apos;ll send you a verification code
               </p>
             </div>
@@ -324,7 +278,7 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-notator-border py-6 text-center text-[10px] text-notator-text-dim">
+      <footer className="border-t border-notator-border px-4 py-6 text-center text-xs text-notator-text-dim">
         <div className="mx-auto max-w-3xl space-y-2">
           <div className="flex items-center justify-center gap-4">
             <Link href="/player" className="hover:text-notator-accent">
@@ -347,7 +301,9 @@ export default function HomePage() {
             <span className="text-notator-text-muted">Notator SL</span> by
             C-Lab/eMagic for the Atari ST
           </p>
-          <p>Built with Next.js, React 19, Tailwind CSS 4</p>
+          <p className="text-[10px]">
+            Built with Next.js, React 19, Tailwind CSS 4
+          </p>
         </div>
       </footer>
 

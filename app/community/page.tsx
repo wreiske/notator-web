@@ -8,14 +8,12 @@ import { useState, useEffect, useCallback } from "react";
 import { listSongs, type SongPublic } from "@/lib/auth/api";
 import { SongCard } from "@/components/songs/SongCard";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth/AuthContext";
 import { LoginModal } from "@/components/auth/LoginModal";
-import { UserMenu } from "@/components/auth/UserMenu";
+import { MobileNav } from "@/components/ui/MobileNav";
 
 type SortOption = "newest" | "top-rated" | "most-liked" | "most-played";
 
 export default function CommunityPage() {
-  const { isAuthenticated } = useAuth();
   const [songs, setSongs] = useState<SongPublic[]>([]);
   const [sort, setSort] = useState<SortOption>("newest");
   const [search, setSearch] = useState("");
@@ -62,43 +60,16 @@ export default function CommunityPage() {
   return (
     <div className="flex min-h-screen flex-col bg-notator-bg-deep font-mono">
       {/* Header */}
-      <header className="border-b border-notator-border bg-notator-surface px-6 py-3">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="text-xl">🎹</span>
-              <span className="text-sm font-bold text-notator-text">
-                Notator
-              </span>
-            </Link>
-            <span className="text-notator-border">|</span>
-            <h1 className="text-sm font-bold text-notator-accent">Community</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/player"
-              className="text-[10px] text-notator-text-dim hover:text-notator-accent"
-            >
-              Player
-            </Link>
-            {isAuthenticated && (
-              <Link
-                href="/files"
-                className="text-[10px] text-notator-text-dim hover:text-notator-accent"
-              >
-                My Files
-              </Link>
-            )}
-            <UserMenu onLoginClick={() => setShowLogin(true)} />
-          </div>
-        </div>
-      </header>
+      <MobileNav
+        onLoginClick={() => setShowLogin(true)}
+        activePage="community"
+      />
 
       {/* Controls */}
-      <div className="border-b border-notator-border bg-notator-panel px-6 py-3">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4">
-          {/* Sort */}
-          <div className="flex gap-1">
+      <div className="border-b border-notator-border bg-notator-panel px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center">
+          {/* Sort — scrollable on mobile */}
+          <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
             {sortOptions.map((opt) => (
               <button
                 key={opt.value}
@@ -106,7 +77,7 @@ export default function CommunityPage() {
                   setSort(opt.value);
                   setPage(1);
                 }}
-                className={`rounded px-2.5 py-1 text-[10px] font-bold transition-colors ${
+                className={`flex-shrink-0 rounded px-3 py-2 text-xs font-bold transition-colors sm:px-2.5 sm:py-1 sm:text-[10px] ${
                   sort === opt.value
                     ? "bg-notator-accent text-white"
                     : "text-notator-text-dim hover:text-notator-text hover:bg-notator-surface-hover"
@@ -118,19 +89,22 @@ export default function CommunityPage() {
             ))}
           </div>
 
-          {/* Search */}
-          <form onSubmit={handleSearch} className="ml-auto flex gap-2">
+          {/* Search — full width on mobile */}
+          <form
+            onSubmit={handleSearch}
+            className="flex w-full gap-2 sm:ml-auto sm:w-auto"
+          >
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search songs..."
-              className="rounded border border-notator-border bg-notator-bg px-3 py-1 font-mono text-[11px] text-notator-text placeholder-notator-text-dim focus:border-notator-accent focus:outline-none"
+              className="min-w-0 flex-1 rounded border border-notator-border bg-notator-bg px-3 py-2 font-mono text-xs text-notator-text placeholder-notator-text-dim focus:border-notator-accent focus:outline-none sm:py-1 sm:text-[11px]"
               id="community-search"
             />
             <button
               type="submit"
-              className="rounded border border-notator-border px-2 py-1 text-[10px] text-notator-text-dim hover:border-notator-accent hover:text-notator-accent"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded border border-notator-border text-sm text-notator-text-dim hover:border-notator-accent hover:text-notator-accent sm:h-auto sm:w-auto sm:px-2 sm:py-1 sm:text-[10px]"
               id="community-search-btn"
             >
               🔍
@@ -140,7 +114,7 @@ export default function CommunityPage() {
       </div>
 
       {/* Song Grid */}
-      <main className="flex-1 px-6 py-6">
+      <main className="flex-1 px-4 py-6 sm:px-6">
         <div className="mx-auto max-w-6xl">
           {loading ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -181,17 +155,17 @@ export default function CommunityPage() {
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="rounded border border-notator-border px-3 py-1 text-[10px] text-notator-text-dim hover:border-notator-accent disabled:opacity-30"
+                    className="rounded border border-notator-border px-4 py-2 text-xs text-notator-text-dim hover:border-notator-accent disabled:opacity-30 sm:px-3 sm:py-1 sm:text-[10px]"
                   >
                     ← Prev
                   </button>
-                  <span className="text-[10px] text-notator-text-dim">
+                  <span className="text-xs text-notator-text-dim sm:text-[10px]">
                     Page {page} of {totalPages}
                   </span>
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="rounded border border-notator-border px-3 py-1 text-[10px] text-notator-text-dim hover:border-notator-accent disabled:opacity-30"
+                    className="rounded border border-notator-border px-4 py-2 text-xs text-notator-text-dim hover:border-notator-accent disabled:opacity-30 sm:px-3 sm:py-1 sm:text-[10px]"
                   >
                     Next →
                   </button>
@@ -203,7 +177,7 @@ export default function CommunityPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-notator-border py-4 text-center text-[10px] text-notator-text-dim">
+      <footer className="border-t border-notator-border py-4 text-center text-xs text-notator-text-dim">
         <p>
           Notator Web — The Atari ST Sequencer Community at{" "}
           <a href="https://notator.online" className="text-notator-accent">

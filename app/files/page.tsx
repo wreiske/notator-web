@@ -7,7 +7,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { LoginModal } from "@/components/auth/LoginModal";
-import { UserMenu } from "@/components/auth/UserMenu";
 import {
   listFiles,
   uploadFile,
@@ -16,6 +15,7 @@ import {
   type FileRecord,
 } from "@/lib/auth/api";
 import Link from "next/link";
+import { MobileNav } from "@/components/ui/MobileNav";
 
 export default function FilesPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -100,9 +100,11 @@ export default function FilesPage() {
   // Require login
   if (!isLoading && !isAuthenticated) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-notator-bg-deep font-mono">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-notator-bg-deep font-mono px-4">
         <span className="text-5xl">📁</span>
-        <h1 className="mt-4 text-2xl font-bold text-notator-text">My Files</h1>
+        <h1 className="mt-4 text-xl font-bold text-notator-text sm:text-2xl">
+          My Files
+        </h1>
         <p className="mt-2 text-sm text-notator-text-muted">
           Sign in to manage your .SON file collection
         </p>
@@ -121,43 +123,13 @@ export default function FilesPage() {
   return (
     <div className="flex min-h-screen flex-col bg-notator-bg-deep font-mono">
       {/* Header */}
-      <header className="border-b border-notator-border bg-notator-surface px-6 py-3">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="text-xl">🎹</span>
-              <span className="text-sm font-bold text-notator-text">
-                Notator
-              </span>
-            </Link>
-            <span className="text-notator-border">|</span>
-            <h1 className="text-sm font-bold text-notator-accent">
-              📁 My Files
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/community"
-              className="text-[10px] text-notator-text-dim hover:text-notator-accent"
-            >
-              Community
-            </Link>
-            <Link
-              href="/player"
-              className="text-[10px] text-notator-text-dim hover:text-notator-accent"
-            >
-              Player
-            </Link>
-            <UserMenu onLoginClick={() => setShowLogin(true)} />
-          </div>
-        </div>
-      </header>
+      <MobileNav onLoginClick={() => setShowLogin(true)} activePage="files" />
 
       {/* Toolbar */}
-      <div className="border-b border-notator-border bg-notator-panel px-6 py-2">
+      <div className="border-b border-notator-border bg-notator-panel px-4 py-2 sm:px-6">
         <div className="mx-auto flex max-w-6xl items-center gap-3">
           {/* Folder breadcrumb */}
-          <div className="flex-1 text-[10px] text-notator-text-dim">
+          <div className="min-w-0 flex-1 truncate text-xs text-notator-text-dim sm:text-[10px]">
             📂{" "}
             {currentFolder === "/"
               ? "Root"
@@ -167,13 +139,13 @@ export default function FilesPage() {
           {/* View toggle */}
           <button
             onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-            className="rounded border border-notator-border px-2 py-1 text-[10px] text-notator-text-dim hover:border-notator-accent"
+            className="flex-shrink-0 rounded border border-notator-border px-3 py-2 text-xs text-notator-text-dim hover:border-notator-accent sm:px-2 sm:py-1 sm:text-[10px]"
           >
             {viewMode === "grid" ? "☰ List" : "⊞ Grid"}
           </button>
 
           {/* Upload button */}
-          <label className="notator-btn cursor-pointer rounded border-notator-accent bg-notator-accent px-3 py-1 text-[10px] text-white hover:bg-notator-accent-hover">
+          <label className="notator-btn flex-shrink-0 cursor-pointer rounded border-notator-accent bg-notator-accent px-3 py-2 text-xs text-white hover:bg-notator-accent-hover sm:px-3 sm:py-1 sm:text-[10px]">
             {uploading ? "Uploading..." : "📤 Upload"}
             <input
               type="file"
@@ -190,7 +162,7 @@ export default function FilesPage() {
 
       {/* Drop zone + file list */}
       <main
-        className={`flex-1 px-6 py-4 ${dragOver ? "ring-2 ring-inset ring-notator-accent/50" : ""}`}
+        className={`flex-1 px-4 py-4 sm:px-6 ${dragOver ? "ring-2 ring-inset ring-notator-accent/50" : ""}`}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
@@ -242,8 +214,8 @@ export default function FilesPage() {
                       🔗 Shared
                     </div>
                   ) : null}
-                  {/* Actions */}
-                  <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  {/* Actions — always visible on mobile, hover on desktop */}
+                  <div className="mt-2 flex gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
                     <Link
                       href={`/player?file=${file.id}`}
                       className="rounded bg-notator-accent/20 px-1.5 py-0.5 text-[9px] text-notator-accent hover:bg-notator-accent/30"
@@ -267,13 +239,13 @@ export default function FilesPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded border border-notator-border">
+            <div className="overflow-x-auto rounded border border-notator-border">
               <table className="w-full text-[11px]">
                 <thead>
                   <tr className="border-b border-notator-border bg-notator-surface text-left text-[10px] font-bold uppercase tracking-wider text-notator-text-dim">
                     <th className="px-3 py-2">Name</th>
-                    <th className="px-3 py-2">Size</th>
-                    <th className="px-3 py-2">Date</th>
+                    <th className="hidden px-3 py-2 sm:table-cell">Size</th>
+                    <th className="hidden px-3 py-2 sm:table-cell">Date</th>
                     <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2">Actions</th>
                   </tr>
@@ -287,10 +259,10 @@ export default function FilesPage() {
                       <td className="px-3 py-2 text-notator-text">
                         🎵 {file.filename}
                       </td>
-                      <td className="px-3 py-2 text-notator-text-dim">
+                      <td className="hidden px-3 py-2 text-notator-text-dim sm:table-cell">
                         {formatSize(file.file_size)}
                       </td>
-                      <td className="px-3 py-2 text-notator-text-dim">
+                      <td className="hidden px-3 py-2 text-notator-text-dim sm:table-cell">
                         {formatDate(file.created_at)}
                       </td>
                       <td className="px-3 py-2">
@@ -356,8 +328,8 @@ export default function FilesPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-notator-border py-4 text-center text-[10px] text-notator-text-dim">
-        <p>Drag \u0026 drop .SON files to upload · 10MB max per file</p>
+      <footer className="border-t border-notator-border py-4 text-center text-xs text-notator-text-dim">
+        <p>Drag &amp; drop .SON files to upload · 10MB max per file</p>
       </footer>
 
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
