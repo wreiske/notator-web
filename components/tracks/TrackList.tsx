@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import type { Track } from "@/lib/son-parser/types";
 
 /** Notator SL track name limit: 8 ASCII characters */
@@ -99,6 +99,18 @@ export function TrackList({
     );
   }
 
+  // Pre-compute per-track stats ONCE per render instead of inside each row
+  const trackStats = tracks.map((track) => {
+    const noteOns = track.events.filter((e) => e.type === "note_on");
+    const noteValues = noteOns.map((e) => (e as { note: number }).note);
+    return {
+      noteOnCount: noteOns.length,
+      minNote: noteValues.length > 0 ? Math.min(...noteValues) : 0,
+      maxNote: noteValues.length > 0 ? Math.max(...noteValues) : 0,
+      notes: noteValues,
+    };
+  });
+
   return (
     <div className="overflow-hidden rounded border border-notator-border-bright">
       <table className="w-full border-collapse font-mono">
@@ -110,16 +122,16 @@ export function TrackList({
             <th className="border-r border-notator-border/50 px-2 py-1 text-left">
               Name
             </th>
-            <th className="border-r border-notator-border/50 px-2 py-1 text-left w-16">
+            <th className="hidden border-r border-notator-border/50 px-2 py-1 text-left w-16 sm:table-cell">
               Status
             </th>
             <th className="border-r border-notator-border/50 px-1.5 py-1 text-center w-12">
               CH
             </th>
-            <th className="border-r border-notator-border/50 px-1.5 py-1 text-right w-14">
+            <th className="hidden border-r border-notator-border/50 px-1.5 py-1 text-right w-14 sm:table-cell">
               Notes
             </th>
-            <th className="border-r border-notator-border/50 px-1.5 py-1 text-center w-20">
+            <th className="hidden border-r border-notator-border/50 px-1.5 py-1 text-center w-20 sm:table-cell">
               Range
             </th>
             <th className="border-r border-notator-border/50 px-0.5 py-1 text-center w-7">
@@ -131,14 +143,7 @@ export function TrackList({
         <tbody className="divide-y divide-notator-border/30">
           {tracks.map((track, index) => {
             const isEmpty = track.events.length === 0 && !track.name;
-            const noteOnCount = track.events.filter(
-              (e) => e.type === "note_on",
-            ).length;
-            const notes = track.events
-              .filter((e) => e.type === "note_on")
-              .map((e) => (e as { note: number }).note);
-            const minNote = notes.length > 0 ? Math.min(...notes) : 0;
-            const maxNote = notes.length > 0 ? Math.max(...notes) : 0;
+            const { noteOnCount, minNote, maxNote, notes } = trackStats[index];
             const isDrums = track.channel === 9;
             const isMuted = mutedTracks.has(index);
             const isSoloed = soloedTracks.has(index);
@@ -176,7 +181,7 @@ export function TrackList({
                 `}
                 id={`track-row-${index}`}
               >
-                <td className="border-r border-notator-border/50 px-1.5 py-1.5 text-center font-bold text-notator-text-muted">
+                <td className="border-r border-notator-border/50 px-1.5 py-2.5 text-center font-bold text-notator-text-muted sm:py-1.5">
                   {trackNum}
                 </td>
                 <td className="max-w-[160px] border-r border-notator-border/50 px-2 py-1.5 font-bold">
@@ -224,7 +229,7 @@ export function TrackList({
                     </span>
                   )}
                 </td>
-                <td className="border-r border-notator-border/50 px-2 py-1.5 text-notator-text-muted">
+                <td className="hidden border-r border-notator-border/50 px-2 py-1.5 text-notator-text-muted sm:table-cell">
                   {isEmpty ? (
                     ""
                   ) : isDrums ? (
@@ -247,10 +252,10 @@ export function TrackList({
                     </>
                   )}
                 </td>
-                <td className="border-r border-notator-border/50 px-1.5 py-1.5 text-right tabular-nums text-notator-text-muted">
+                <td className="hidden border-r border-notator-border/50 px-1.5 py-1.5 text-right tabular-nums text-notator-text-muted sm:table-cell">
                   {noteOnCount > 0 ? noteOnCount : ""}
                 </td>
-                <td className="border-r border-notator-border/50 px-1.5 py-1.5 text-center text-notator-text-dim">
+                <td className="hidden border-r border-notator-border/50 px-1.5 py-1.5 text-center text-notator-text-dim sm:table-cell">
                   {notes.length > 0 && !isDrums ? (
                     <span>
                       {midiNoteToName(minNote)}-{midiNoteToName(maxNote)}
@@ -305,3 +310,8 @@ export function TrackList({
     </div>
   );
 }
+
+// Memoize to prevent re-renders when only tick changes (the parent
+// re-renders at ~15fps for transport display, but TrackList only needs
+// to update when tracks/mute/solo/selection actually change).
+export const MemoizedTrackList = memo(TrackList);

@@ -173,8 +173,10 @@ export function TransportBar({
 
       {/* Top: menu bar + branding */}
       <div className="flex items-center justify-between border-b border-notator-border px-1 py-0 text-[11px]">
-        <MenuBar menus={menus} />
-        <div className="flex items-center gap-2 pr-2">
+        <div className="min-w-0 overflow-x-auto">
+          <MenuBar menus={menus} />
+        </div>
+        <div className="hidden items-center gap-2 pr-2 sm:flex">
           <span className="tracking-[0.3em] text-notator-text-muted">
             N O T A T O R
           </span>
@@ -183,20 +185,20 @@ export function TransportBar({
         </div>
       </div>
 
-      {/* Main transport row */}
-      <div className="flex items-center gap-2 px-3 py-1.5">
+      {/* Main transport row — stacks on mobile */}
+      <div className="flex flex-wrap items-center gap-2 px-3 py-1.5">
         {/* Song & status info */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Song name */}
           <div className="flex items-center rounded border border-notator-border bg-notator-bg px-2 py-0.5">
-            <span className="text-[10px] text-notator-text-dim mr-1">♪</span>
-            <span className="text-xs font-bold text-notator-text truncate max-w-[120px]">
+            <span className="mr-1 text-[10px] text-notator-text-dim">♪</span>
+            <span className="max-w-[80px] truncate text-xs font-bold text-notator-text sm:max-w-[120px]">
               {songName || "---"}
             </span>
           </div>
 
-          {/* Sync */}
-          <div className="rounded border border-notator-border bg-notator-bg px-2 py-0.5 text-[10px] text-notator-text-dim">
+          {/* Sync — hidden on mobile */}
+          <div className="hidden rounded border border-notator-border bg-notator-bg px-2 py-0.5 text-[10px] text-notator-text-dim sm:block">
             intern
           </div>
         </div>
@@ -211,7 +213,7 @@ export function TransportBar({
               const v = parseInt(e.target.value, 10);
               if (!isNaN(v) && v >= 20 && v <= 300) onTempoChange(v);
             }}
-            className="w-14 bg-transparent text-center text-sm font-bold text-notator-accent outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="w-10 bg-transparent text-center text-sm font-bold text-notator-accent outline-none sm:w-14 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             id="tempo-input"
           />
         </div>
@@ -223,31 +225,31 @@ export function TransportBar({
         </div>
 
         {/* Spacer */}
-        <div className="flex-1" />
+        <div className="hidden flex-1 sm:block" />
 
         {/* Position display */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
           {/* Current position */}
-          <div className="flex items-center gap-1 rounded border border-notator-border-bright bg-notator-surface-active px-3 py-1">
-            <span className="text-lg font-bold tabular-nums tracking-wider text-notator-text">
+          <div className="flex items-center gap-1 rounded border border-notator-border-bright bg-notator-surface-active px-2 py-0.5 sm:px-3 sm:py-1">
+            <span className="text-sm font-bold tabular-nums tracking-wider text-notator-text sm:text-lg">
               {formatPosition(currentTick)}
             </span>
           </div>
 
           {/* Divider */}
-          <span className="text-notator-text-dim">/</span>
+          <span className="hidden text-notator-text-dim sm:inline">/</span>
 
-          {/* Total */}
-          <div className="flex items-center rounded border border-notator-border bg-notator-bg px-2 py-1">
+          {/* Total — hidden on mobile */}
+          <div className="hidden items-center rounded border border-notator-border bg-notator-bg px-2 py-1 sm:flex">
             <span className="text-xs tabular-nums text-notator-text-muted">
               {formatPosition(totalTicks)}
             </span>
           </div>
 
-          {/* BAR display */}
-          <div className="flex items-center gap-1 rounded border border-notator-border bg-notator-bg px-2 py-0.5 text-[10px]">
+          {/* BAR display — hidden on mobile */}
+          <div className="hidden items-center gap-1 rounded border border-notator-border bg-notator-bg px-2 py-0.5 text-[10px] sm:flex">
             <span className="text-notator-text-dim">BAR</span>
-            <span className="font-bold text-notator-accent tabular-nums">
+            <span className="font-bold tabular-nums text-notator-accent">
               {String(Math.floor(currentTick / 768) + 1).padStart(3, " ")}
             </span>
           </div>
@@ -256,16 +258,16 @@ export function TransportBar({
 
       {/* Bottom: Transport buttons */}
       <div className="flex items-center justify-between border-t border-notator-border px-3 py-1.5">
-        {/* Left: MIDI status */}
+        {/* Left: MIDI status — simplified on mobile */}
         <div className="flex items-center gap-2 text-[10px]">
-          <span className="rounded border border-notator-border bg-notator-bg px-2 py-0.5 text-notator-text-dim">
+          <span className="hidden rounded border border-notator-border bg-notator-bg px-2 py-0.5 text-notator-text-dim sm:inline">
             MIDI THRU
           </span>
           <div className="flex items-center gap-1">
             <div
               className={`h-1.5 w-1.5 rounded-full ${
                 state === "playing"
-                  ? "bg-notator-green animate-pulse"
+                  ? "animate-pulse bg-notator-green"
                   : "bg-notator-text-dim"
               }`}
             />
@@ -273,12 +275,12 @@ export function TransportBar({
           </div>
         </div>
 
-        {/* Right: Transport buttons */}
+        {/* Right: Transport buttons — bigger touch targets on mobile */}
         <div className="flex items-center gap-1.5">
           {/* STOP */}
           <button
             onClick={onStop}
-            className={`notator-btn rounded px-4 py-1 text-[11px] ${
+            className={`notator-btn min-h-[44px] rounded px-4 py-2 text-[11px] sm:min-h-0 sm:py-1 ${
               state === "stopped"
                 ? "border-notator-red bg-notator-red/20 text-notator-red"
                 : "border-notator-border text-notator-text-muted hover:border-notator-red hover:text-notator-red"
@@ -291,7 +293,7 @@ export function TransportBar({
           {/* START - acts as play from beginning or resume */}
           <button
             onClick={onPlay}
-            className={`notator-btn rounded px-4 py-1 text-[11px] ${
+            className={`notator-btn min-h-[44px] rounded px-4 py-2 text-[11px] sm:min-h-0 sm:py-1 ${
               state === "playing"
                 ? "border-notator-green bg-notator-green/20 text-notator-green"
                 : "border-notator-border text-notator-text-muted hover:border-notator-green hover:text-notator-green"
@@ -304,7 +306,7 @@ export function TransportBar({
           {/* CONT - continue/pause */}
           <button
             onClick={state === "playing" ? onPause : onPlay}
-            className={`notator-btn rounded px-4 py-1 text-[11px] ${
+            className={`notator-btn min-h-[44px] rounded px-4 py-2 text-[11px] sm:min-h-0 sm:py-1 ${
               state === "paused"
                 ? "border-notator-accent bg-notator-accent/20 text-notator-accent"
                 : "border-notator-border text-notator-text-muted hover:border-notator-accent hover:text-notator-accent"

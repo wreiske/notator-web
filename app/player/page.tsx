@@ -9,11 +9,11 @@ import {
 } from "react";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { TransportBar } from "@/components/transport/TransportBar";
-import { TrackList } from "@/components/tracks/TrackList";
+import { MemoizedTrackList as TrackList } from "@/components/tracks/TrackList";
 import { TrackContextMenu } from "@/components/tracks/TrackContextMenu";
 import { PianoRollEditor } from "@/components/tracks/PianoRollEditor";
 import { NotationTimeline } from "@/components/tracks/NotationTimeline";
-import { parseSonFile } from "@/lib/son-parser";
+import { parseSonFileWasm } from "@/lib/son-parser/wasm-adapter";
 import type {
   SonFile,
   SongData,
@@ -88,11 +88,26 @@ export default function PlayerPage() {
   const [activeTrackIndices, setActiveTrackIndices] = useState<Set<number>>(
     new Set(),
   );
+
+  // ── Performance: high-frequency refs (avoid React re-renders) ──
+  // The engine fires onPositionChange every 25ms. Instead of calling
+  // setState each time (which re-renders the entire 1300-line component),
+  // we write to refs and update React state at a throttled rate.
+  const tickRef = useRef(0);
+  const activeTracksRef = useRef<Set<number>>(new Set());
+  const activeTrackTimers = useRef<Map<number, number>>(new Map());
+  const rafIdRef = useRef(0);
+  const lastDisplayUpdateRef = useRef(0);
   const [activePatternIndex, setActivePatternIndex] = useState(0);
   const [currentArrangementIndex, setCurrentArrangementIndex] = useState(0);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState(0);
   const [loopEnabled, setLoopEnabled] = useState(false);
   const [showTimeline, setShowTimeline] = useState(true);
+
+  // Mobile panel navigation
+  const [activePanel, setActivePanel] = useState<"arrange" | "tracks" | "info">(
+    "tracks",
+  );
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -109,6 +124,7 @@ export default function PlayerPage() {
   const [editorPlaybackState, setEditorPlaybackState] = useState<
     "stopped" | "playing" | "paused"
   >("stopped");
+  const editorTickRef = useRef(0);
   const [editorCurrentTick, setEditorCurrentTick] = useState(0);
   const [editorLoopEnabled, setEditorLoopEnabled] = useState(false);
   const [editorLoopStart, setEditorLoopStart] = useState(-1);
@@ -118,6 +134,40 @@ export default function PlayerPage() {
   // Refs
   const engineRef = useRef<PlaybackEngine | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── rAF display loop: reads refs and updates React state at ~15fps ──
+  useEffect(() => {
+    let running = true;
+    const DISPLAY_INTERVAL_MS = 66; // ~15fps for transport text
+
+    const displayLoop = () => {
+      if (!running) return;
+      const now = performance.now();
+      if (now - lastDisplayUpdateRef.current >= DISPLAY_INTERVAL_MS) {
+        lastDisplayUpdateRef.current = now;
+        const t = tickRef.current;
+        setCurrentTick(t);
+        setEditorCurrentTick(t);
+
+        // Sync active track indices to React state for TrackList highlighting
+        setActiveTrackIndices((prev) => {
+          // Only update if the set actually changed
+          const ref = activeTracksRef.current;
+          if (prev.size === ref.size && [...prev].every((v) => ref.has(v))) {
+            return prev; // same — skip re-render
+          }
+          return new Set(ref);
+        });
+      }
+      rafIdRef.current = requestAnimationFrame(displayLoop);
+    };
+    rafIdRef.current = requestAnimationFrame(displayLoop);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(rafIdRef.current);
+    };
+  }, []);
 
   // Initialize engine
   useEffect(() => {
@@ -131,26 +181,31 @@ export default function PlayerPage() {
         else if (state === "paused") setEditorPlaybackState("paused");
       },
       onPositionChange: (tick: number) => {
-        setCurrentTick(tick);
-        setEditorCurrentTick(tick);
+        // HOT PATH — write to ref only, NO React setState here.
+        // The rAF display loop reads this ref at ~15fps.
+        tickRef.current = tick;
+        editorTickRef.current = tick;
       },
       onTrackEvent: (trackIndex: number) => {
-        setActiveTrackIndices((prev) => {
-          const next = new Set(prev);
-          next.add(trackIndex);
-          setTimeout(() => {
-            setActiveTrackIndices((p) => {
-              const n = new Set(p);
-              n.delete(trackIndex);
-              return n;
-            });
-          }, 100);
-          return next;
-        });
+        // HOT PATH — mutate ref in-place, no React setState.
+        // Direct DOM update for track row highlighting.
+        activeTracksRef.current.add(trackIndex);
+
+        // Schedule removal after 100ms via lightweight timer
+        const prev = activeTrackTimers.current.get(trackIndex);
+        if (prev) clearTimeout(prev);
+        activeTrackTimers.current.set(
+          trackIndex,
+          window.setTimeout(() => {
+            activeTracksRef.current.delete(trackIndex);
+            activeTrackTimers.current.delete(trackIndex);
+          }, 100),
+        );
       },
       onPatternChange: (patternIndex: number) => {
         setActivePatternIndex(patternIndex);
         setSelectedTrackIndex(0);
+        activeTracksRef.current.clear();
         setActiveTrackIndices(new Set());
         // Update the displayed song to show the new pattern's tracks
         setSong((prev) => {
@@ -171,7 +226,14 @@ export default function PlayerPage() {
       },
     });
     engineRef.current = engine;
-    return () => engine.destroy();
+    return () => {
+      engine.destroy();
+      // Clear all active track timers
+      const timers = activeTrackTimers.current;
+      for (const timer of timers.values()) {
+        clearTimeout(timer);
+      }
+    };
   }, []);
 
   // Global keyboard shortcuts (spacebar play/pause, etc.)
@@ -202,10 +264,10 @@ export default function PlayerPage() {
 
   // Load a .SON file
   const handleFileLoad = useCallback(
-    (buffer: ArrayBuffer, fileName: string) => {
+    async (buffer: ArrayBuffer, fileName: string) => {
       try {
         setError(null);
-        const parsed = parseSonFile(buffer);
+        const parsed = await parseSonFileWasm(buffer);
         setSonFile(parsed);
         setSong(parsed.songData);
         setSongName(fileName.replace(/\.son$/i, ""));
@@ -283,6 +345,10 @@ export default function PlayerPage() {
   const handlePlay = useCallback(() => engineRef.current?.play(), []);
   const handlePause = useCallback(() => engineRef.current?.pause(), []);
   const handleStop = useCallback(() => engineRef.current?.stop(), []);
+  const handleSeek = useCallback((tick: number) => {
+    engineRef.current?.seekTo(tick);
+    tickRef.current = tick;
+  }, []);
   const handleTempoChange = useCallback((bpm: number) => {
     setTempo(bpm);
     engineRef.current?.setTempo(bpm);
@@ -465,6 +531,10 @@ export default function PlayerPage() {
 
   const handleEditorSeek = useCallback((tick: number) => {
     engineRef.current?.seekTo(tick);
+    // Set tickRef AFTER seekTo — seekTo clamps to pattern length via
+    // onPositionChange, but the piano roll may display a wider range.
+    // This prevents the rAF loop from snapping the cursor back.
+    tickRef.current = tick;
     setEditorCurrentTick(tick);
   }, []);
 
@@ -785,10 +855,38 @@ export default function PlayerPage() {
         <UserMenu onLoginClick={() => setShowLogin(true)} />
       </div>
 
+      {/* Mobile panel tabs — visible only below sm */}
+      <div className="flex border-b border-notator-border bg-notator-surface sm:hidden">
+        {(
+          [
+            { key: "arrange", label: "📋 Arrange" },
+            { key: "tracks", label: "🎵 Tracks" },
+            { key: "info", label: "ℹ️ Info" },
+          ] as const
+        ).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActivePanel(key)}
+            className={`flex-1 px-3 py-2.5 text-xs font-bold transition-colors ${
+              activePanel === key
+                ? "border-b-2 border-notator-accent bg-notator-surface-active text-notator-accent"
+                : "text-notator-text-dim hover:text-notator-text"
+            }`}
+            id={`panel-tab-${key}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* 3-Panel body */}
       <div className="flex flex-1 overflow-hidden">
         {/* ─── LEFT PANEL: ARRANGE (Arrangement List) ─── */}
-        <aside className="flex w-72 flex-shrink-0 flex-col border-r border-notator-border-bright bg-notator-panel">
+        <aside
+          className={`flex w-full flex-shrink-0 flex-col border-r border-notator-border-bright bg-notator-panel sm:flex sm:w-72 ${
+            activePanel === "arrange" ? "flex" : "hidden"
+          }`}
+        >
           {/* Panel header */}
           <div className="flex items-center justify-end border-b border-notator-border px-3 py-1.5">
             <button
@@ -832,20 +930,22 @@ export default function PlayerPage() {
                         }`}
                         id={`arrange-row-${idx}`}
                       >
-                        <td className="w-8 px-2 py-1.5 text-right text-notator-text-muted">
+                        <td className="w-8 px-2 py-2.5 text-right text-notator-text-muted sm:py-1.5">
                           {entry.bar}
                         </td>
-                        <td className="px-2 py-1.5 font-bold">{entry.name}</td>
-                        <td className="w-5 py-1.5 text-center text-notator-text-dim">
+                        <td className="px-2 py-2.5 font-bold sm:py-1.5">
+                          {entry.name}
+                        </td>
+                        <td className="w-5 py-2.5 text-center text-notator-text-dim sm:py-1.5">
                           {entry.columns.a || ""}
                         </td>
-                        <td className="w-5 py-1.5 text-center text-notator-text-dim">
+                        <td className="w-5 py-2.5 text-center text-notator-text-dim sm:py-1.5">
                           {entry.columns.b || ""}
                         </td>
-                        <td className="w-5 py-1.5 text-center text-notator-text-dim">
+                        <td className="w-5 py-2.5 text-center text-notator-text-dim sm:py-1.5">
                           {entry.columns.c || ""}
                         </td>
-                        <td className="w-5 py-1.5 text-center text-notator-text-dim">
+                        <td className="w-5 py-2.5 text-center text-notator-text-dim sm:py-1.5">
                           {entry.columns.d || ""}
                         </td>
                       </tr>
@@ -862,11 +962,13 @@ export default function PlayerPage() {
                         }`}
                         id={`pattern-row-${idx}`}
                       >
-                        <td className="w-8 px-2 py-1.5 text-right text-notator-text-muted">
+                        <td className="w-8 px-2 py-2.5 text-right text-notator-text-muted sm:py-1.5">
                           {idx + 1}
                         </td>
-                        <td className="px-2 py-1.5 font-bold">{pat.name}</td>
-                        <td className="w-6 px-2 py-1.5 text-right text-notator-text-dim">
+                        <td className="px-2 py-2.5 font-bold sm:py-1.5">
+                          {pat.name}
+                        </td>
+                        <td className="w-6 px-2 py-2.5 text-right text-notator-text-dim sm:py-1.5">
                           {pat.tracks.length}
                         </td>
                       </tr>
@@ -903,20 +1005,26 @@ export default function PlayerPage() {
         </aside>
 
         {/* ─── CENTER PANEL: TRACK GRID ─── */}
-        <main className="flex flex-1 flex-col overflow-hidden">
+        <main
+          className={`flex flex-1 flex-col overflow-hidden sm:flex ${
+            activePanel === "tracks" ? "flex" : "hidden"
+          }`}
+        >
           {/* Status bar */}
-          <div className="flex items-center gap-3 border-b border-notator-border bg-notator-surface px-3 py-1 text-[10px]">
-            <span className="font-bold uppercase tracking-widest text-notator-text-dim">
+          <div className="flex items-center gap-2 border-b border-notator-border bg-notator-surface px-3 py-1 text-[10px] sm:gap-3">
+            <span className="hidden font-bold uppercase tracking-widest text-notator-text-dim sm:inline">
               Status
             </span>
-            <span className="font-bold text-notator-text">{songName}</span>
-            <span className="text-notator-text-dim">
+            <span className="truncate font-bold text-notator-text">
+              {songName}
+            </span>
+            <span className="hidden text-notator-text-dim sm:inline">
               {song.tracks.length} tracks
             </span>
-            <span className="text-notator-text-dim">·</span>
+            <span className="hidden text-notator-text-dim sm:inline">·</span>
             <span className="text-notator-accent">
               {song.patterns.find((p) => p.index === activePatternIndex)
-                ?.name || `Pattern ${activePatternIndex + 1}`}
+                ?.name || `P${activePatternIndex + 1}`}
             </span>
             <span className="ml-auto">
               <button
@@ -934,7 +1042,7 @@ export default function PlayerPage() {
           </div>
 
           {/* Track grid */}
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="flex-1 overflow-y-auto p-1 sm:p-2">
             <TrackList
               tracks={song.tracks}
               mutedTracks={mutedTracks}
@@ -952,7 +1060,11 @@ export default function PlayerPage() {
         </main>
 
         {/* ─── RIGHT PANEL: TRACK INFO ─── */}
-        <aside className="flex w-48 flex-shrink-0 flex-col border-l border-notator-border-bright bg-notator-panel">
+        <aside
+          className={`flex w-full flex-shrink-0 flex-col border-l border-notator-border-bright bg-notator-panel sm:flex sm:w-48 ${
+            activePanel === "info" ? "flex" : "hidden"
+          }`}
+        >
           {/* Panel header */}
           <div className="border-b border-notator-border px-3 py-1.5">
             <span className="text-[10px] font-bold uppercase tracking-widest text-notator-text-dim">
@@ -1242,6 +1354,7 @@ export default function PlayerPage() {
             currentTick={currentTick}
             selectedTrackIndex={selectedTrackIndex}
             isPlaying={playbackState === "playing"}
+            onSeek={handleSeek}
           />
         </div>
       )}
