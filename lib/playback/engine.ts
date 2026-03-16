@@ -213,12 +213,10 @@ export class PlaybackEngine {
         performance.now() / 1000 - this.ticksToSeconds(this.pausePosition);
       this.resetTrackStateFromTick(this.pausePosition);
     } else {
-      // Starting from the very beginning
-      if (this.useArrangement && this.currentArrangementIndex !== 0) {
-        this.loadArrangementEntry(0);
-      } else {
-        this.resetTrackState();
-      }
+      // Starting from tick 0 of the CURRENT entry/pattern.
+      // If the user jumped to a specific arrangement entry (e.g. "verse"),
+      // we play from the start of THAT entry, not from entry 0.
+      this.resetTrackState();
       this.startTime = performance.now() / 1000;
     }
 
@@ -238,9 +236,8 @@ export class PlaybackEngine {
     this.silenceAll();
   }
 
-  /** Stop playback and reset to beginning */
+  /** Stop playback and reset position to beginning of current entry */
   stop(): void {
-    const wasPlaying = this.state === "playing" || this.state === "paused";
     this.state = "stopped";
     this.pausePosition = 0;
     this.callbacks.onStateChange?.("stopped");
@@ -248,15 +245,10 @@ export class PlaybackEngine {
     this.stopScheduler();
     this.silenceAll();
 
-    // Only reset arrangement/tracks if we were actually playing
-    if (wasPlaying) {
-      if (this.useArrangement && this.song) {
-        this.currentArrangementIndex = 0;
-        this.loadArrangementEntry(0);
-      } else {
-        this.resetTrackState();
-      }
-    }
+    // Reset track cursors to the beginning of the CURRENT entry/pattern.
+    // Do NOT reset to arrangement entry 0 — the user may have selected
+    // a specific entry (e.g. "verse") and expects Stop to park at its start.
+    this.resetTrackState();
   }
 
   /** Jump to a specific arrangement entry (for UI clicks) */
@@ -313,11 +305,6 @@ export class PlaybackEngine {
     this.pausePosition = 0;
     this.callbacks.onPatternChange?.(patternIndex);
     this.callbacks.onPositionChange?.(0);
-
-    console.log(
-      `[Engine] Switched to pattern ${patternIndex + 1}: ` +
-        `"${pattern.name}" (${pattern.tracks.length} tracks, ${pattern.totalTicks} ticks)`,
-    );
 
     if (wasPlaying) {
       this.startTime = performance.now() / 1000;
@@ -470,13 +457,6 @@ export class PlaybackEngine {
       channel: track.channel,
     }));
 
-    console.log(
-      `[Engine] Loaded arrangement entry ${arrangementIndex + 1}/${arrangement.length}: ` +
-        `pattern "${pattern.name}" (idx=${entry.patternIndex}), ` +
-        `bars ${entry.bar}–${entry.bar + entry.length - 1}, ` +
-        `${this.currentEntryTotalTicks} ticks`,
-    );
-
     // Notify UI
     this.callbacks.onPatternChange?.(entry.patternIndex);
     this.callbacks.onArrangementChange?.(arrangementIndex, entry.patternIndex);
@@ -554,11 +534,6 @@ export class PlaybackEngine {
       // Notify UI
       this.callbacks.onPatternChange?.(nextIndex);
       this.callbacks.onPositionChange?.(0);
-
-      console.log(
-        `[Engine] Advanced to pattern ${nextIndex + 1} ` +
-          `(${nextPattern.tracks.length} tracks, ${nextPattern.totalTicks} ticks)`,
-      );
 
       // Continue the scheduler loop
       this.schedulerTimer = setTimeout(this.scheduleLoop, this.LOOKAHEAD_MS);

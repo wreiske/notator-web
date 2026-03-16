@@ -78,8 +78,8 @@ export class SynthFallback {
   private instruments: Map<number, any> = new Map();
   /** Loaded drum presets by MIDI note number */
   private drums: Map<number, any> = new Map();
-  /** Currently active note envelopes */
-  private activeNotes: Map<string, ActiveEnvelope> = new Map();
+  /** Currently active note envelopes (key = channel * 128 + note) */
+  private activeNotes: Map<number, ActiveEnvelope> = new Map();
   /** Per-channel program assignment (default: 0 = Acoustic Grand Piano) */
   private channelPrograms: number[] = new Array(16).fill(0);
   /** Set of instruments currently being loaded */
@@ -129,7 +129,7 @@ export class SynthFallback {
   noteOn(channel: number, note: number, velocity: number): void {
     if (!this.audioContext || !this.masterGain || !this.player) return;
 
-    const key = `${channel}-${note}`;
+    const key = channel * 128 + note;
     this.noteOff(channel, note); // Stop any existing note
 
     const volume = (velocity / 127) * 0.8;
@@ -181,7 +181,7 @@ export class SynthFallback {
   noteOff(channel: number, note: number): void {
     if (!this.audioContext) return;
 
-    const key = `${channel}-${note}`;
+    const key = channel * 128 + note;
     const active = this.activeNotes.get(key);
     if (!active || !active.envelope) return;
 

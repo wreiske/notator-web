@@ -41,6 +41,7 @@ interface NotationTimelineProps {
   currentTick: number;
   selectedTrackIndex: number;
   isPlaying: boolean;
+  onSeek?: (tick: number) => void;
 }
 
 /** Piano key labels for the left gutter */
@@ -73,6 +74,7 @@ export function NotationTimeline({
   currentTick,
   selectedTrackIndex,
   isPlaying,
+  onSeek,
 }: NotationTimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -180,6 +182,33 @@ export function NotationTimeline({
       GUTTER_WIDTH +
       ((tick - displayStartTick) / ticksPerBeat) * PIXELS_PER_BEAT,
     [displayStartTick, ticksPerBeat],
+  );
+
+  /** Convert an X pixel coordinate back to a tick */
+  const xToTick = useCallback(
+    (x: number) =>
+      displayStartTick + ((x - GUTTER_WIDTH) / PIXELS_PER_BEAT) * ticksPerBeat,
+    [displayStartTick, ticksPerBeat],
+  );
+
+  // ── Click-to-seek on the canvas ──────────────────────────────────
+  const handleCanvasClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!onSeek) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvasWidth / rect.width;
+      const x = (e.clientX - rect.left) * scaleX;
+      if (x < GUTTER_WIDTH) return;
+
+      const tick = xToTick(x);
+      // Snap to the nearest beat
+      const snappedTick = Math.round(tick / ticksPerBeat) * ticksPerBeat;
+      const clampedTick = Math.max(0, Math.min(snappedTick, totalTicks));
+      onSeek(clampedTick);
+    },
+    [onSeek, canvasWidth, xToTick, ticksPerBeat, totalTicks],
   );
 
   // Auto-scroll during playback
@@ -398,7 +427,11 @@ export function NotationTimeline({
         className="overflow-x-auto overflow-y-hidden"
         style={{ maxHeight: `${Math.min(canvasHeight, 240)}px` }}
       >
-        <canvas ref={canvasRef} />
+        <canvas
+          ref={canvasRef}
+          onClick={handleCanvasClick}
+          style={{ cursor: onSeek ? "pointer" : "default" }}
+        />
       </div>
     </div>
   );

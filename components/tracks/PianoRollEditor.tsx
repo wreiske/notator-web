@@ -278,6 +278,14 @@ export function PianoRollEditor({
   const lastPreviewNoteRef = useRef<number>(-1);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Performance: overlay canvases for cursor (avoids full redraw) ──
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const velOverlayRef = useRef<HTMLCanvasElement>(null);
+  const rulerOverlayRef = useRef<HTMLCanvasElement>(null);
+  const cursorRafRef = useRef(0);
+  const currentTickRef = useRef(currentTick);
+  currentTickRef.current = currentTick;
+
   // ─── Layout constants ─────────────────────────────────────────────
   const GUTTER_WIDTH = 52;
   const NOTE_HEIGHT = 14;
@@ -437,22 +445,8 @@ export function PianoRollEditor({
     }
 
     // ─── Note rectangles ──────────────────────────────────────────
-    // First pass: draw row highlights for active notes
-    if (isPlaying && currentTick > 0) {
-      for (const n of notes) {
-        const isActive = currentTick >= n.startTick && currentTick < n.endTick;
-        if (isActive) {
-          const y = noteToY(n.note);
-          ctx.fillStyle = "rgba(0, 220, 255, 0.06)";
-          ctx.fillRect(
-            GUTTER_WIDTH,
-            y,
-            canvasWidth - GUTTER_WIDTH,
-            NOTE_HEIGHT,
-          );
-        }
-      }
-    }
+    // NOTE: Active note highlights and cursor are drawn on the overlay canvas
+    // via rAF (see drawCursorOverlay). They are NOT drawn here.
 
     // Second pass: draw note bodies
     for (const n of notes) {
@@ -463,8 +457,6 @@ export function PianoRollEditor({
         ((n.endTick - n.startTick) / ticksPerBeat) * PIXELS_PER_BEAT,
       );
       const isSelected = selectedIds.has(n.id);
-      const isActive =
-        isPlaying && currentTick >= n.startTick && currentTick < n.endTick;
 
       // Color based on velocity
       const velRatio = n.velocity / 127;
@@ -472,14 +464,7 @@ export function PianoRollEditor({
       const g = Math.round(40 + velRatio * 60);
       const b_val = Math.round(40 + velRatio * 60);
 
-      if (isActive) {
-        // ✦ Active/playing note — bright neon glow
-        ctx.shadowColor = "rgba(0, 220, 255, 0.8)";
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = `rgba(0, 230, 255, ${0.85 + velRatio * 0.15})`;
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 1.5;
-      } else if (isSelected) {
+      if (isSelected) {
         ctx.fillStyle = "#ffbb44dd";
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 1.5;
@@ -496,21 +481,15 @@ export function PianoRollEditor({
       ctx.fill();
       ctx.stroke();
 
-      // Reset shadow after active note glow
-      if (isActive) {
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-      }
-
       // Note name inside (if wide enough)
       if (w > 28) {
-        ctx.fillStyle = isActive ? "#000" : isSelected ? "#000" : "#fff";
+        ctx.fillStyle = isSelected ? "#000" : "#fff";
         ctx.font = "bold 8px 'IBM Plex Mono', monospace";
         ctx.fillText(noteName(n.note), x + 3, y + NOTE_HEIGHT - 5);
       }
 
       // Resize handle (right edge)
-      ctx.fillStyle = isActive ? "#fff8" : isSelected ? "#fff8" : "#fff3";
+      ctx.fillStyle = isSelected ? "#fff8" : "#fff3";
       ctx.fillRect(x + w - 4, y + 2, 3, NOTE_HEIGHT - 6);
 
       ctx.lineWidth = 1;
@@ -533,19 +512,7 @@ export function PianoRollEditor({
       ctx.setLineDash([]);
     }
 
-    // ─── Playback cursor line through main grid ───────────────────
-    if (currentTick > 0) {
-      const cx = tickToX(currentTick);
-      if (cx >= GUTTER_WIDTH && cx <= canvasWidth) {
-        ctx.strokeStyle = "#ff556688";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(cx, 0);
-        ctx.lineTo(cx, canvasHeight);
-        ctx.stroke();
-        ctx.lineWidth = 1;
-      }
-    }
+    // NOTE: Playback cursor is drawn on the overlay canvas via rAF.
   }, [
     notes,
     selectedIds,
@@ -558,8 +525,6 @@ export function PianoRollEditor({
     tickToX,
     noteToY,
     marquee,
-    currentTick,
-    isPlaying,
   ]);
 
   // ─── Velocity lane drawing ────────────────────────────────────────
@@ -678,20 +643,8 @@ export function PianoRollEditor({
       ctx.lineWidth = 1;
     }
 
-    // Playback cursor line through velocity lane
-    if (currentTick > 0) {
-      const cx = tickToX(currentTick);
-      if (cx >= GUTTER_WIDTH && cx <= canvasWidth) {
-        ctx.strokeStyle = "#ff556688";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(cx, 0);
-        ctx.lineTo(cx, VELOCITY_HEIGHT);
-        ctx.stroke();
-        ctx.lineWidth = 1;
-      }
-    }
-  }, [notes, selectedIds, canvasWidth, tickToX, currentTick, velDraw]);
+    // NOTE: Playback cursor in velocity lane drawn on overlay via rAF.
+  }, [notes, selectedIds, canvasWidth, tickToX, velDraw]);
 
   // ─── Note preview ─────────────────────────────────────────────────
   const previewNote = useCallback(
@@ -778,48 +731,12 @@ export function PianoRollEditor({
     }
     ctx.lineWidth = 1;
 
-    // Playback cursor
-    if (currentTick > 0) {
-      const cx = tickToX(currentTick);
-      if (cx >= GUTTER_WIDTH && cx <= canvasWidth) {
-        ctx.strokeStyle = "#ff5566";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(cx, 0);
-        ctx.lineTo(cx, RULER_HEIGHT);
-        ctx.stroke();
-
-        // Cursor head (triangle)
-        ctx.fillStyle = "#ff5566";
-        ctx.beginPath();
-        ctx.moveTo(cx - 4, 0);
-        ctx.lineTo(cx + 4, 0);
-        ctx.lineTo(cx, 6);
-        ctx.closePath();
-        ctx.fill();
-        ctx.lineWidth = 1;
-      }
-    }
-
-    // Gutter separator
-    ctx.strokeStyle = "#4466cc";
-    ctx.beginPath();
-    ctx.moveTo(GUTTER_WIDTH - 0.5, 0);
-    ctx.lineTo(GUTTER_WIDTH - 0.5, RULER_HEIGHT);
-    ctx.stroke();
-
-    // Bottom border
-    ctx.strokeStyle = "#4466cc44";
-    ctx.beginPath();
-    ctx.moveTo(0, RULER_HEIGHT - 0.5);
-    ctx.lineTo(canvasWidth, RULER_HEIGHT - 0.5);
-    ctx.stroke();
+    // NOTE: Playback cursor in ruler drawn on overlay via rAF.
   }, [
     canvasWidth,
     ticksPerMeasure,
     ticksPerBeat,
     totalMeasures,
-    currentTick,
     loopEnabled,
     loopStart,
     loopEnd,
@@ -836,6 +753,172 @@ export function PianoRollEditor({
   useEffect(() => {
     drawRuler();
   }, [drawRuler]);
+
+  // ── Performance: lightweight cursor overlay via rAF ──────────────
+  // Draws ONLY the playback cursor line and active note highlights
+  // on transparent overlay canvases. Runs at display refresh rate
+  // without causing React re-renders or expensive full canvas redraws.
+  useEffect(() => {
+    let running = true;
+
+    const drawOverlays = () => {
+      if (!running) return;
+      const tick = currentTickRef.current;
+
+      // ── Main grid overlay (cursor + active note glow) ──
+      const overlay = overlayCanvasRef.current;
+      if (overlay) {
+        const ctx = overlay.getContext("2d");
+        if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          if (overlay.width !== canvasWidth * dpr) {
+            overlay.width = canvasWidth * dpr;
+            overlay.height = canvasHeight * dpr;
+            overlay.style.width = `${canvasWidth}px`;
+            overlay.style.height = `${canvasHeight}px`;
+          }
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+          if (tick > 0) {
+            // Active note row highlights
+            if (isPlaying) {
+              for (const n of notes) {
+                if (tick >= n.startTick && tick < n.endTick) {
+                  const y = noteToY(n.note);
+                  ctx.fillStyle = "rgba(0, 220, 255, 0.06)";
+                  ctx.fillRect(
+                    GUTTER_WIDTH,
+                    y,
+                    canvasWidth - GUTTER_WIDTH,
+                    NOTE_HEIGHT,
+                  );
+                }
+              }
+
+              // Active note glow overlay
+              for (const n of notes) {
+                if (tick >= n.startTick && tick < n.endTick) {
+                  const y = noteToY(n.note) + 1;
+                  const x = tickToX(n.startTick);
+                  const w = Math.max(
+                    3,
+                    ((n.endTick - n.startTick) / ticksPerBeat) *
+                      PIXELS_PER_BEAT,
+                  );
+                  const velRatio = n.velocity / 127;
+
+                  ctx.shadowColor = "rgba(0, 220, 255, 0.8)";
+                  ctx.shadowBlur = 12;
+                  ctx.fillStyle = `rgba(0, 230, 255, ${0.85 + velRatio * 0.15})`;
+                  ctx.strokeStyle = "#ffffff";
+                  ctx.lineWidth = 1.5;
+                  ctx.beginPath();
+                  ctx.roundRect(x, y, w, NOTE_HEIGHT - 2, 2);
+                  ctx.fill();
+                  ctx.stroke();
+                  ctx.shadowColor = "transparent";
+                  ctx.shadowBlur = 0;
+                }
+              }
+            }
+
+            // Cursor line
+            const cx = tickToX(tick);
+            if (cx >= GUTTER_WIDTH && cx <= canvasWidth) {
+              ctx.strokeStyle = "#ff556688";
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              ctx.moveTo(cx, 0);
+              ctx.lineTo(cx, canvasHeight);
+              ctx.stroke();
+            }
+          }
+        }
+      }
+
+      // ── Velocity overlay (cursor line only) ──
+      const velOv = velOverlayRef.current;
+      if (velOv) {
+        const ctx = velOv.getContext("2d");
+        if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          if (velOv.width !== canvasWidth * dpr) {
+            velOv.width = canvasWidth * dpr;
+            velOv.height = VELOCITY_HEIGHT * dpr;
+            velOv.style.width = `${canvasWidth}px`;
+            velOv.style.height = `${VELOCITY_HEIGHT}px`;
+          }
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.clearRect(0, 0, canvasWidth, VELOCITY_HEIGHT);
+          if (tick > 0) {
+            const cx = tickToX(tick);
+            if (cx >= GUTTER_WIDTH && cx <= canvasWidth) {
+              ctx.strokeStyle = "#ff556688";
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              ctx.moveTo(cx, 0);
+              ctx.lineTo(cx, VELOCITY_HEIGHT);
+              ctx.stroke();
+            }
+          }
+        }
+      }
+
+      // ── Ruler overlay (cursor + head triangle) ──
+      const rulerOv = rulerOverlayRef.current;
+      if (rulerOv) {
+        const ctx = rulerOv.getContext("2d");
+        if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          if (rulerOv.width !== canvasWidth * dpr) {
+            rulerOv.width = canvasWidth * dpr;
+            rulerOv.height = RULER_HEIGHT * dpr;
+            rulerOv.style.width = `${canvasWidth}px`;
+            rulerOv.style.height = `${RULER_HEIGHT}px`;
+          }
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.clearRect(0, 0, canvasWidth, RULER_HEIGHT);
+          if (tick > 0) {
+            const cx = tickToX(tick);
+            if (cx >= GUTTER_WIDTH && cx <= canvasWidth) {
+              ctx.strokeStyle = "#ff5566";
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(cx, 0);
+              ctx.lineTo(cx, RULER_HEIGHT);
+              ctx.stroke();
+
+              // Triangle cursor head
+              ctx.fillStyle = "#ff5566";
+              ctx.beginPath();
+              ctx.moveTo(cx - 4, 0);
+              ctx.lineTo(cx + 4, 0);
+              ctx.lineTo(cx, 6);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+        }
+      }
+
+      cursorRafRef.current = requestAnimationFrame(drawOverlays);
+    };
+
+    cursorRafRef.current = requestAnimationFrame(drawOverlays);
+    return () => {
+      running = false;
+      cancelAnimationFrame(cursorRafRef.current);
+    };
+  }, [
+    notes,
+    canvasWidth,
+    canvasHeight,
+    tickToX,
+    noteToY,
+    isPlaying,
+    ticksPerBeat,
+  ]);
 
   // Auto-scroll to note range on mount
   useEffect(() => {
@@ -1985,18 +2068,30 @@ export function PianoRollEditor({
             }}
           >
             {/* Ruler / scrubber */}
-            <div className="flex-shrink-0" style={{ height: RULER_HEIGHT }}>
+            <div
+              className="flex-shrink-0 relative"
+              style={{ height: RULER_HEIGHT }}
+            >
               <canvas
                 ref={rulerCanvasRef}
                 onMouseDown={handleRulerMouseDown}
                 style={{ cursor: "pointer" }}
+              />
+              <canvas
+                ref={rulerOverlayRef}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  pointerEvents: "none",
+                }}
               />
             </div>
 
             {/* Main grid */}
             <div
               ref={containerRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden"
+              className="flex-1 overflow-y-auto overflow-x-hidden relative"
               style={{
                 cursor:
                   tool === "draw"
@@ -2013,11 +2108,20 @@ export function PianoRollEditor({
                 onMouseUp={handleCanvasMouseUp}
                 onMouseLeave={handleCanvasMouseUp}
               />
+              <canvas
+                ref={overlayCanvasRef}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  pointerEvents: "none",
+                }}
+              />
             </div>
 
             {/* Velocity lane */}
             <div
-              className="border-t border-notator-border flex-shrink-0"
+              className="border-t border-notator-border flex-shrink-0 relative"
               style={{
                 height: VELOCITY_HEIGHT,
                 cursor: selectedIds.size > 0 ? "crosshair" : "default",
@@ -2029,6 +2133,15 @@ export function PianoRollEditor({
                 onMouseMove={handleVelMouseMove}
                 onMouseUp={handleVelMouseUp}
                 onMouseLeave={handleVelMouseLeave}
+              />
+              <canvas
+                ref={velOverlayRef}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  pointerEvents: "none",
+                }}
               />
             </div>
           </div>

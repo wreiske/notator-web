@@ -1,0 +1,31 @@
+[package]
+name = "son-parser"
+version = "0.1.0"
+edition = "2021"
+description = "Notator SL .SON file parser and MIDI exporter"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "son_to_midi"
+path = "src/bin/son_to_midi.rs"
+
+[features]
+default = []
+wasm = ["wasm-bindgen", "serde", "serde-wasm-bindgen", "js-sys"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+js-sys = { version = "0.3", optional = true }
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
