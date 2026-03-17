@@ -20,7 +20,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   const file = await env.DB.prepare(
-    "SELECT * FROM user_files WHERE id = ? AND user_id = ?"
+    "SELECT * FROM user_files WHERE id = ? AND user_id = ?",
   )
     .bind(fileId, user.id)
     .first<UserFileRecord>();
@@ -32,7 +32,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (file.is_shared && file.share_token) {
     // Unshare
     await env.DB.prepare(
-      "UPDATE user_files SET is_shared = 0, share_token = NULL WHERE id = ?"
+      "UPDATE user_files SET is_shared = 0, share_token = NULL WHERE id = ?",
     )
       .bind(fileId)
       .run();
@@ -42,14 +42,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   // Share — generate token
   const token = generateId();
   await env.DB.prepare(
-    "UPDATE user_files SET is_shared = 1, share_token = ? WHERE id = ?"
+    "UPDATE user_files SET is_shared = 1, share_token = ? WHERE id = ?",
   )
     .bind(token, fileId)
     .run();
 
   return jsonResponse({
     shared: true,
-    shareUrl: `https://notator.online/shared/${token}`,
+    shareUrl: `https://notator.online/shared?token=${token}`,
     token,
   });
 };

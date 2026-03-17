@@ -5,8 +5,10 @@ import {
   useCallback,
   useRef,
   useEffect,
+  Suspense,
   type ChangeEvent,
 } from "react";
+import { useSearchParams } from "next/navigation";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { TransportBar } from "@/components/transport/TransportBar";
 import { MemoizedTrackList as TrackList } from "@/components/tracks/TrackList";
@@ -31,6 +33,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { LoginModal } from "@/components/auth/LoginModal";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { PublishModal } from "@/components/songs/PublishModal";
+import { downloadUserFile } from "@/lib/auth/api";
 
 /** Demo .SON files bundled from the /st directory */
 const DEMO_FILES = [
@@ -61,8 +64,9 @@ function midiNoteName(note: number): string {
   return `${names[note % 12]}${Math.floor(note / 12) - 1}`;
 }
 
-export default function PlayerPage() {
+function PlayerContent() {
   const { isAuthenticated } = useAuth();
+  const searchParams = useSearchParams();
 
   // Song state (sonFile preserved for future write-back/export)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -72,6 +76,7 @@ export default function PlayerPage() {
   const [songBuffer, setSongBuffer] = useState<ArrayBuffer | null>(null);
   const [songFileName, setSongFileName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loadingFile, setLoadingFile] = useState(false);
 
   // Auth / Community UI state
   const [showLogin, setShowLogin] = useState(false);
@@ -299,6 +304,47 @@ export default function PlayerPage() {
     },
     [],
   );
+
+  // ── Auto-load file from query params ──
+  useEffect(() => {
+    const fileId = searchParams.get("file");
+    const source = searchParams.get("source");
+
+    if (fileId && !song && !loadingFile) {
+      // Load user's file by ID
+      setLoadingFile(true);
+      downloadUserFile(fileId)
+        .then(({ buffer, filename }) => {
+          handleFileLoad(buffer, filename);
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : "Failed to load file");
+        })
+        .finally(() => setLoadingFile(false));
+    } else if (source === "shared" && !song && !loadingFile) {
+      // Load shared file from sessionStorage
+      const base64 = sessionStorage.getItem("notator_shared_file");
+      const filename =
+        sessionStorage.getItem("notator_shared_filename") || "Shared.SON";
+      if (base64) {
+        try {
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          handleFileLoad(bytes.buffer, filename);
+          sessionStorage.removeItem("notator_shared_file");
+          sessionStorage.removeItem("notator_shared_filename");
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : "Failed to load shared file",
+          );
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Load a demo file
   const handleDemoLoad = useCallback(
@@ -729,6 +775,20 @@ export default function PlayerPage() {
   const notes = noteOns.map((e) => (e as { note: number }).note);
   const minNote = notes.length ? Math.min(...notes) : 0;
   const maxNote = notes.length ? Math.max(...notes) : 0;
+
+  // ═══════════════════════════════════════════════════════════════
+  // Loading file from query param
+  // ═══════════════════════════════════════════════════════════════
+  if (loadingFile) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-notator-bg-deep">
+        <div className="animate-pulse space-y-4 text-center">
+          <span className="text-5xl">🎵</span>
+          <p className="text-sm text-notator-text-muted">Loading song…</p>
+        </div>
+      </div>
+    );
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // Loading state — show file upload
@@ -1436,5 +1496,21 @@ export default function PlayerPage() {
         songFileName={songFileName}
       />
     </div>
+  );
+}
+
+export default function PlayerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-notator-bg-deep">
+          <div className="animate-pulse text-notator-text-muted text-sm">
+            Loading…
+          </div>
+        </div>
+      }
+    >
+      <PlayerContent />
+    </Suspense>
   );
 }

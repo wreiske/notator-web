@@ -78,7 +78,7 @@ export function UserMenu({ onLoginClick }: UserMenuProps) {
 
           {/* Menu items */}
           <Link
-            href={`/profile/${user?.id}`}
+            href={`/profile?id=${user?.id}`}
             className="notator-menu-item"
             onClick={() => setIsOpen(false)}
             id="user-menu-profile"

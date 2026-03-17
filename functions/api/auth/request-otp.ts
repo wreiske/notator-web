@@ -27,18 +27,21 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // Rate limit: check for recent OTP
   const recent = await env.DB.prepare(
-    "SELECT * FROM otp_codes WHERE email = ? AND used = 0 AND created_at > datetime('now', '-60 seconds') ORDER BY created_at DESC LIMIT 1"
+    "SELECT * FROM otp_codes WHERE email = ? AND used = 0 AND created_at > datetime('now', '-60 seconds') ORDER BY created_at DESC LIMIT 1",
   )
     .bind(email)
     .first<OtpRecord>();
 
   if (recent) {
-    return errorResponse("Please wait 60 seconds before requesting another code", 429);
+    return errorResponse(
+      "Please wait 60 seconds before requesting another code",
+      429,
+    );
   }
 
   // Clean up expired OTPs (prevent table bloat)
   await env.DB.prepare(
-    "DELETE FROM otp_codes WHERE expires_at < datetime('now', '-1 hour')"
+    "DELETE FROM otp_codes WHERE expires_at < datetime('now', '-1 hour')",
   ).run();
 
   // Generate OTP
@@ -48,7 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // Store OTP
   await env.DB.prepare(
-    "INSERT INTO otp_codes (id, email, code, expires_at) VALUES (?, ?, ?, ?)"
+    "INSERT INTO otp_codes (id, email, code, expires_at) VALUES (?, ?, ?, ?)",
   )
     .bind(id, email, code, expiresAt)
     .run();

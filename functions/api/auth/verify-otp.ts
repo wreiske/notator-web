@@ -6,7 +6,12 @@
  */
 
 import { createToken, generateId } from "../../lib/auth";
-import type { Env, OtpRecord, UserRecord, VerifyOtpBody } from "../../lib/types";
+import type {
+  Env,
+  OtpRecord,
+  UserRecord,
+  VerifyOtpBody,
+} from "../../lib/types";
 import { jsonResponse, errorResponse } from "../../lib/types";
 
 const MAX_ATTEMPTS = 5;
@@ -30,13 +35,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // Find the latest unused, unexpired OTP for this email
   const otp = await env.DB.prepare(
-    "SELECT * FROM otp_codes WHERE email = ? AND used = 0 AND expires_at > datetime('now') ORDER BY created_at DESC LIMIT 1"
+    "SELECT * FROM otp_codes WHERE email = ? AND used = 0 AND expires_at > datetime('now') ORDER BY created_at DESC LIMIT 1",
   )
     .bind(email)
     .first<OtpRecord>();
 
   if (!otp) {
-    return errorResponse("No valid verification code found. Please request a new one.", 400);
+    return errorResponse(
+      "No valid verification code found. Please request a new one.",
+      400,
+    );
   }
 
   // Check attempts
@@ -49,7 +57,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   // Increment attempt counter
-  await env.DB.prepare("UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?")
+  await env.DB.prepare(
+    "UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?",
+  )
     .bind(otp.id)
     .run();
 
@@ -58,7 +68,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const remaining = MAX_ATTEMPTS - otp.attempts - 1;
     return errorResponse(
       `Invalid code. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`,
-      400
+      400,
     );
   }
 
@@ -76,7 +86,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const userId = generateId();
     const displayName = email.split("@")[0]; // Default display name from email prefix
     await env.DB.prepare(
-      "INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)"
+      "INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)",
     )
       .bind(userId, email, displayName)
       .run();

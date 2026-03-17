@@ -18,30 +18,26 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // Check if already liked
   const existing = await env.DB.prepare(
-    "SELECT 1 FROM likes WHERE song_id = ? AND user_id = ?"
+    "SELECT 1 FROM likes WHERE song_id = ? AND user_id = ?",
   )
     .bind(songId, user.id)
     .first();
 
   if (existing) {
     // Unlike
-    await env.DB.prepare(
-      "DELETE FROM likes WHERE song_id = ? AND user_id = ?"
-    )
+    await env.DB.prepare("DELETE FROM likes WHERE song_id = ? AND user_id = ?")
       .bind(songId, user.id)
       .run();
   } else {
     // Like
-    await env.DB.prepare(
-      "INSERT INTO likes (song_id, user_id) VALUES (?, ?)"
-    )
+    await env.DB.prepare("INSERT INTO likes (song_id, user_id) VALUES (?, ?)")
       .bind(songId, user.id)
       .run();
   }
 
   // Get updated count
   const count = await env.DB.prepare(
-    "SELECT COUNT(*) as count FROM likes WHERE song_id = ?"
+    "SELECT COUNT(*) as count FROM likes WHERE song_id = ?",
   )
     .bind(songId)
     .first<{ count: number }>();

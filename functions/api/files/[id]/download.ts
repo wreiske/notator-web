@@ -1,24 +1,29 @@
 /**
- * Shared file access (public)
+ * File download API (auth required — owner only)
  *
- * GET /api/files/shared/:token — download a shared file (no auth required)
+ * GET /api/files/:id/download — serve file binary from R2
  */
 
-import type { Env, UserFileRecord } from "../../../lib/types";
+import type { Env, UserRecord, UserFileRecord } from "../../../lib/types";
 import { errorResponse } from "../../../lib/types";
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { env, params } = context;
-  const token = params.token as string;
+  const user = context.data.user as UserRecord | null;
+  const fileId = params.id as string;
+
+  if (!user) {
+    return errorResponse("Authentication required", 401);
+  }
 
   const file = await env.DB.prepare(
-    "SELECT * FROM user_files WHERE share_token = ? AND is_shared = 1",
+    "SELECT * FROM user_files WHERE id = ? AND user_id = ?",
   )
-    .bind(token)
+    .bind(fileId, user.id)
     .first<UserFileRecord>();
 
   if (!file) {
-    return errorResponse("Shared file not found or no longer shared", 404);
+    return errorResponse("File not found", 404);
   }
 
   const object = await env.R2.get(file.r2_key);

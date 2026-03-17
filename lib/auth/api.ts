@@ -259,6 +259,92 @@ export async function toggleFileShare(fileId: string) {
   }>(`/files/${fileId}/share`, { method: "POST" });
 }
 
+export function uploadFileWithProgress(
+  file: File,
+  folder: string | undefined,
+  onProgress: (loaded: number, total: number) => void,
+): Promise<{ file: FileRecord }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append("file", file);
+    if (folder) formData.append("folder", folder);
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        onProgress(e.loaded, e.total);
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error("Invalid response"));
+        }
+      } else {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          reject(
+            new ApiError(
+              data.error || `Upload failed: ${xhr.status}`,
+              xhr.status,
+            ),
+          );
+        } catch {
+          reject(new ApiError(`Upload failed: ${xhr.status}`, xhr.status));
+        }
+      }
+    });
+
+    xhr.addEventListener("error", () => {
+      reject(new Error("Network error during upload"));
+    });
+
+    xhr.open("POST", `${API_BASE}/files`);
+    const token = getToken();
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+    xhr.send(formData);
+  });
+}
+
+export async function downloadUserFile(
+  fileId: string,
+): Promise<{ buffer: ArrayBuffer; filename: string }> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE}/files/${fileId}/download`, {
+    headers,
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new ApiError(
+      (data as { error?: string }).error ||
+        `Download failed: ${response.status}`,
+      response.status,
+    );
+  }
+
+  // Extract filename from Content-Disposition
+  let filename = "file.son";
+  const disposition = response.headers.get("Content-Disposition");
+  if (disposition) {
+    const match = disposition.match(/filename="?([^";\n]+)"?/);
+    if (match) filename = match[1];
+  }
+
+  const buffer = await response.arrayBuffer();
+  return { buffer, filename };
+}
+
 // ─── Stats API ───
 
 export async function getCommunityStats() {

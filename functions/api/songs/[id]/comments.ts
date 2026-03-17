@@ -15,13 +15,15 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { env, params } = context;
   const songId = params.id as string;
 
-  const { results } = await env.DB.prepare(`
+  const { results } = await env.DB.prepare(
+    `
     SELECT c.*, u.display_name as author_name, u.avatar_url as author_avatar
     FROM comments c
     LEFT JOIN users u ON c.user_id = u.id
     WHERE c.song_id = ?
     ORDER BY c.created_at DESC
-  `)
+  `,
+  )
     .bind(songId)
     .all();
 
@@ -39,7 +41,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return errorResponse("Authentication required", 401);
   }
 
-  const body = await request.json() as { body?: string };
+  const body = (await request.json()) as { body?: string };
   const text = body.body?.trim();
 
   if (!text || text.length === 0) {
@@ -61,17 +63,19 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const commentId = generateId();
   await env.DB.prepare(
-    "INSERT INTO comments (id, song_id, user_id, body) VALUES (?, ?, ?, ?)"
+    "INSERT INTO comments (id, song_id, user_id, body) VALUES (?, ?, ?, ?)",
   )
     .bind(commentId, songId, user.id, text)
     .run();
 
-  const comment = await env.DB.prepare(`
+  const comment = await env.DB.prepare(
+    `
     SELECT c.*, u.display_name as author_name, u.avatar_url as author_avatar
     FROM comments c
     LEFT JOIN users u ON c.user_id = u.id
     WHERE c.id = ?
-  `)
+  `,
+  )
     .bind(commentId)
     .first();
 

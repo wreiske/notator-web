@@ -10,13 +10,15 @@ import { jsonResponse } from "../lib/types";
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { env } = context;
 
-  const stats = await env.DB.prepare(`
+  const stats = await env.DB.prepare(
+    `
     SELECT
       (SELECT COUNT(*) FROM users) as total_users,
       (SELECT COUNT(*) FROM songs WHERE is_public = 1) as total_songs,
       (SELECT COALESCE(SUM(play_count), 0) FROM songs WHERE is_public = 1) as total_plays,
       (SELECT COUNT(*) FROM comments) as total_comments
-  `).first<{
+  `,
+  ).first<{
     total_users: number;
     total_songs: number;
     total_plays: number;

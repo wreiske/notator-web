@@ -33,7 +33,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (payload) {
       // Look up user from DB
       const user = await context.env.DB.prepare(
-        "SELECT * FROM users WHERE id = ?"
+        "SELECT * FROM users WHERE id = ?",
       )
         .bind(payload.sub)
         .first<UserRecord>();
@@ -61,7 +61,9 @@ function corsHeaders(request: Request): Record<string, string> {
     "http://localhost:3000",
     "http://localhost:8788", // wrangler pages dev
   ];
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : ALLOWED_ORIGINS[0];
 
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
@@ -70,4 +72,3 @@ function corsHeaders(request: Request): Record<string, string> {
     "Access-Control-Max-Age": "86400",
   };
 }
-

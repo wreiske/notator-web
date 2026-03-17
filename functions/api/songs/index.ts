@@ -6,7 +6,12 @@
  */
 
 import { generateId } from "../../lib/auth";
-import type { Env, UserRecord, SongRecord, PublishSongBody } from "../../lib/types";
+import type {
+  Env,
+  UserRecord,
+  SongRecord,
+  PublishSongBody,
+} from "../../lib/types";
 import { jsonResponse, errorResponse } from "../../lib/types";
 
 const MAX_SONG_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -27,7 +32,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const url = new URL(request.url);
 
   const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"));
-  const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get("limit") || "20")));
+  const limit = Math.min(
+    50,
+    Math.max(1, parseInt(url.searchParams.get("limit") || "20")),
+  );
   const sort = url.searchParams.get("sort") || "newest";
   const tag = url.searchParams.get("tag");
   const search = url.searchParams.get("q");
@@ -81,7 +89,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   query += " LIMIT ? OFFSET ?";
   params.push(limit, offset);
 
-  const { results } = await env.DB.prepare(query).bind(...params).all();
+  const { results } = await env.DB.prepare(query)
+    .bind(...params)
+    .all();
 
   // Get total count
   let countQuery = "SELECT COUNT(*) as total FROM songs WHERE is_public = 1";
@@ -169,7 +179,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return errorResponse("Year must be a 4-digit number", 400);
   }
 
-  if (metadata.tags && (!Array.isArray(metadata.tags) || metadata.tags.length > 10)) {
+  if (
+    metadata.tags &&
+    (!Array.isArray(metadata.tags) || metadata.tags.length > 10)
+  ) {
     return errorResponse("Tags must be an array of up to 10 items", 400);
   }
 
@@ -187,7 +200,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   let version = 1;
   if (metadata.parentSongId) {
     const parent = await env.DB.prepare(
-      "SELECT version FROM songs WHERE id = ? AND user_id = ?"
+      "SELECT version FROM songs WHERE id = ? AND user_id = ?",
     )
       .bind(metadata.parentSongId, user.id)
       .first<{ version: number }>();
@@ -196,13 +209,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // Sanitize tags
   const sanitizedTags = metadata.tags
-    ? JSON.stringify(metadata.tags.map(t => String(t).trim().slice(0, 30)))
+    ? JSON.stringify(metadata.tags.map((t) => String(t).trim().slice(0, 30)))
     : null;
 
   // Insert song record
   await env.DB.prepare(
     `INSERT INTO songs (id, user_id, title, description, year, tags, r2_key, file_size, is_public, version, parent_song_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       songId,
@@ -215,12 +228,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       file.size,
       metadata.isPublic !== false ? 1 : 0,
       version,
-      metadata.parentSongId || null
+      metadata.parentSongId || null,
     )
     .run();
 
   const song = await env.DB.prepare(
-    "SELECT id, user_id, title, description, year, tags, file_size, is_public, version, parent_song_id, play_count, created_at, updated_at FROM songs WHERE id = ?"
+    "SELECT id, user_id, title, description, year, tags, file_size, is_public, version, parent_song_id, play_count, created_at, updated_at FROM songs WHERE id = ?",
   )
     .bind(songId)
     .first<SongRecord>();

@@ -16,7 +16,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return errorResponse("Authentication required", 401);
   }
 
-  const body = await request.json() as { score?: number };
+  const body = (await request.json()) as { score?: number };
   const score = body.score;
 
   if (!score || !Number.isInteger(score) || score < 1 || score > 5) {
@@ -25,20 +25,20 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // Upsert rating
   const existing = await env.DB.prepare(
-    "SELECT 1 FROM ratings WHERE song_id = ? AND user_id = ?"
+    "SELECT 1 FROM ratings WHERE song_id = ? AND user_id = ?",
   )
     .bind(songId, user.id)
     .first();
 
   if (existing) {
     await env.DB.prepare(
-      "UPDATE ratings SET score = ? WHERE song_id = ? AND user_id = ?"
+      "UPDATE ratings SET score = ? WHERE song_id = ? AND user_id = ?",
     )
       .bind(score, songId, user.id)
       .run();
   } else {
     await env.DB.prepare(
-      "INSERT INTO ratings (song_id, user_id, score) VALUES (?, ?, ?)"
+      "INSERT INTO ratings (song_id, user_id, score) VALUES (?, ?, ?)",
     )
       .bind(songId, user.id, score)
       .run();
@@ -46,7 +46,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // Get updated average
   const avg = await env.DB.prepare(
-    "SELECT AVG(score) as avg_rating, COUNT(*) as count FROM ratings WHERE song_id = ?"
+    "SELECT AVG(score) as avg_rating, COUNT(*) as count FROM ratings WHERE song_id = ?",
   )
     .bind(songId)
     .first<{ avg_rating: number; count: number }>();

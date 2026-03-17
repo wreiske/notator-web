@@ -12,7 +12,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const songId = params.id as string;
 
   const song = await env.DB.prepare(
-    "SELECT * FROM songs WHERE id = ? AND is_public = 1"
+    "SELECT * FROM songs WHERE id = ? AND is_public = 1",
   )
     .bind(songId)
     .first<SongRecord>();

@@ -36,20 +36,17 @@ function textToUint8(text: string): Uint8Array {
 // ─── Key management ───
 
 async function getSigningKey(secret: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    "raw",
-    textToUint8(secret),
-    ALGORITHM,
-    false,
-    ["sign", "verify"]
-  );
+  return crypto.subtle.importKey("raw", textToUint8(secret), ALGORITHM, false, [
+    "sign",
+    "verify",
+  ]);
 }
 
 // ─── JWT Creation ───
 
 export async function createToken(
   user: UserRecord,
-  secret: string
+  secret: string,
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "HS256", typ: "JWT" };
@@ -60,19 +57,15 @@ export async function createToken(
     exp: now + TOKEN_EXPIRY,
   };
 
-  const headerB64 = base64UrlEncode(
-    textToUint8(JSON.stringify(header))
-  );
-  const payloadB64 = base64UrlEncode(
-    textToUint8(JSON.stringify(payload))
-  );
+  const headerB64 = base64UrlEncode(textToUint8(JSON.stringify(header)));
+  const payloadB64 = base64UrlEncode(textToUint8(JSON.stringify(payload)));
   const signingInput = `${headerB64}.${payloadB64}`;
 
   const key = await getSigningKey(secret);
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
-    textToUint8(signingInput)
+    textToUint8(signingInput),
   );
 
   const signatureB64 = base64UrlEncode(new Uint8Array(signature));
@@ -83,7 +76,7 @@ export async function createToken(
 
 export async function verifyToken(
   token: string,
-  secret: string
+  secret: string,
 ): Promise<JwtPayload | null> {
   try {
     const parts = token.split(".");
@@ -98,13 +91,13 @@ export async function verifyToken(
       "HMAC",
       key,
       signature,
-      textToUint8(signingInput)
+      textToUint8(signingInput),
     );
 
     if (!valid) return null;
 
     const payload: JwtPayload = JSON.parse(
-      new TextDecoder().decode(base64UrlDecode(payloadB64))
+      new TextDecoder().decode(base64UrlDecode(payloadB64)),
     );
 
     // Check expiry

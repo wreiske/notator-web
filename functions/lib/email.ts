@@ -27,13 +27,15 @@ const OTP_EMAIL_HTML = (code: string) => `
 export async function sendOtpEmail(
   email: string,
   code: string,
-  env: Env
+  env: Env,
 ): Promise<void> {
   const domain = env.MAILGUN_DOMAIN;
   const apiKey = env.MAILGUN_API_KEY;
 
   if (!domain || !apiKey) {
-    throw new Error("Mailgun configuration missing (MAILGUN_DOMAIN, MAILGUN_API_KEY)");
+    throw new Error(
+      "Mailgun configuration missing (MAILGUN_DOMAIN, MAILGUN_API_KEY)",
+    );
   }
 
   const form = new FormData();
@@ -50,7 +52,7 @@ export async function sendOtpEmail(
         Authorization: `Basic ${btoa(`api:${apiKey}`)}`,
       },
       body: form,
-    }
+    },
   );
 
   if (!response.ok) {

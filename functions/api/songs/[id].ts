@@ -17,7 +17,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const user = context.data.user as UserRecord | null;
 
   // Only return public songs, or the owner's own private songs
-  const song = await env.DB.prepare(`
+  const song = await env.DB.prepare(
+    `
     SELECT s.id, s.user_id, s.title, s.description, s.year, s.tags,
       s.file_size, s.is_public, s.version, s.parent_song_id, s.play_count,
       s.created_at, s.updated_at,
@@ -32,7 +33,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     LEFT JOIN likes l ON s.id = l.song_id
     WHERE s.id = ? AND (s.is_public = 1 OR s.user_id = ?)
     GROUP BY s.id
-  `)
+  `,
+  )
     .bind(songId, user?.id || "")
     .first();
 
@@ -46,14 +48,14 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   if (user) {
     const like = await env.DB.prepare(
-      "SELECT 1 FROM likes WHERE song_id = ? AND user_id = ?"
+      "SELECT 1 FROM likes WHERE song_id = ? AND user_id = ?",
     )
       .bind(songId, user.id)
       .first();
     userLiked = !!like;
 
     const rating = await env.DB.prepare(
-      "SELECT score FROM ratings WHERE song_id = ? AND user_id = ?"
+      "SELECT score FROM ratings WHERE song_id = ? AND user_id = ?",
     )
       .bind(songId, user.id)
       .first<{ score: number }>();
@@ -61,9 +63,12 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 
   // Increment play count (only for public songs, not the owner viewing their own)
-  if ((song as Record<string, unknown>).is_public === 1 && user?.id !== (song as Record<string, unknown>).user_id) {
+  if (
+    (song as Record<string, unknown>).is_public === 1 &&
+    user?.id !== (song as Record<string, unknown>).user_id
+  ) {
     await env.DB.prepare(
-      "UPDATE songs SET play_count = play_count + 1 WHERE id = ?"
+      "UPDATE songs SET play_count = play_count + 1 WHERE id = ?",
     )
       .bind(songId)
       .run();
@@ -85,7 +90,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
 
   // Verify ownership
   const song = await env.DB.prepare(
-    "SELECT * FROM songs WHERE id = ? AND user_id = ?"
+    "SELECT * FROM songs WHERE id = ? AND user_id = ?",
   )
     .bind(songId, user.id)
     .first<SongRecord>();
@@ -94,7 +99,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     return errorResponse("Song not found or not authorized", 404);
   }
 
-  const body = await request.json() as Partial<{
+  const body = (await request.json()) as Partial<{
     title: string;
     description: string;
     year: string;
@@ -132,7 +137,9 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
       return errorResponse("Tags must be an array of up to 10 items", 400);
     }
     updates.push("tags = ?");
-    values.push(JSON.stringify(body.tags.map(t => String(t).trim().slice(0, 30))));
+    values.push(
+      JSON.stringify(body.tags.map((t) => String(t).trim().slice(0, 30))),
+    );
   }
   if (body.isPublic !== undefined) {
     updates.push("is_public = ?");
@@ -146,14 +153,12 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   updates.push("updated_at = datetime('now')");
   values.push(songId);
 
-  await env.DB.prepare(
-    `UPDATE songs SET ${updates.join(", ")} WHERE id = ?`
-  )
+  await env.DB.prepare(`UPDATE songs SET ${updates.join(", ")} WHERE id = ?`)
     .bind(...values)
     .run();
 
   const updated = await env.DB.prepare(
-    "SELECT id, user_id, title, description, year, tags, file_size, is_public, version, parent_song_id, play_count, created_at, updated_at FROM songs WHERE id = ?"
+    "SELECT id, user_id, title, description, year, tags, file_size, is_public, version, parent_song_id, play_count, created_at, updated_at FROM songs WHERE id = ?",
   )
     .bind(songId)
     .first<SongRecord>();
@@ -173,7 +178,7 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
   }
 
   const song = await env.DB.prepare(
-    "SELECT * FROM songs WHERE id = ? AND user_id = ?"
+    "SELECT * FROM songs WHERE id = ? AND user_id = ?",
   )
     .bind(songId, user.id)
     .first<SongRecord>();

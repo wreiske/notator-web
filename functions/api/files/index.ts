@@ -24,19 +24,22 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const folder = url.searchParams.get("folder") || "/";
 
   const { results } = await env.DB.prepare(
-    "SELECT * FROM user_files WHERE user_id = ? AND folder = ? ORDER BY filename ASC"
+    "SELECT * FROM user_files WHERE user_id = ? AND folder = ? ORDER BY filename ASC",
   )
     .bind(user.id, folder)
     .all<UserFileRecord>();
 
   // Get all distinct folders for navigation
   const { results: folders } = await env.DB.prepare(
-    "SELECT DISTINCT folder FROM user_files WHERE user_id = ? ORDER BY folder ASC"
+    "SELECT DISTINCT folder FROM user_files WHERE user_id = ? ORDER BY folder ASC",
   )
     .bind(user.id)
     .all<{ folder: string }>();
 
-  return jsonResponse({ files: results, folders: folders.map((f) => f.folder) });
+  return jsonResponse({
+    files: results,
+    folders: folders.map((f) => f.folder),
+  });
 };
 
 // ─── POST /api/files ───
@@ -73,14 +76,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // Store record
   await env.DB.prepare(
-    "INSERT INTO user_files (id, user_id, filename, folder, r2_key, file_size) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO user_files (id, user_id, filename, folder, r2_key, file_size) VALUES (?, ?, ?, ?, ?, ?)",
   )
     .bind(fileId, user.id, file.name, folder, r2Key, file.size)
     .run();
 
-  const record = await env.DB.prepare(
-    "SELECT * FROM user_files WHERE id = ?"
-  )
+  const record = await env.DB.prepare("SELECT * FROM user_files WHERE id = ?")
     .bind(fileId)
     .first<UserFileRecord>();
 
@@ -105,7 +106,7 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
   }
 
   const file = await env.DB.prepare(
-    "SELECT * FROM user_files WHERE id = ? AND user_id = ?"
+    "SELECT * FROM user_files WHERE id = ? AND user_id = ?",
   )
     .bind(fileId, user.id)
     .first<UserFileRecord>();

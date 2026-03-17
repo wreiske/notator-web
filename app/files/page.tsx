@@ -9,13 +9,17 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { LoginModal } from "@/components/auth/LoginModal";
 import {
   listFiles,
-  uploadFile,
+  uploadFileWithProgress,
   deleteFile,
   toggleFileShare,
   type FileRecord,
 } from "@/lib/auth/api";
 import Link from "next/link";
 import { MobileNav } from "@/components/ui/MobileNav";
+import {
+  UploadProgressOverlay,
+  type UploadItem,
+} from "@/components/ui/UploadProgressOverlay";
 
 export default function FilesPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -24,6 +28,7 @@ export default function FilesPage() {
   const [currentFolder, setCurrentFolder] = useState("/");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [showLogin, setShowLogin] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -47,17 +52,55 @@ export default function FilesPage() {
   }, [isAuthenticated, loadFiles]);
 
   const handleUpload = async (fileList: FileList) => {
+    const files = Array.from(fileList);
+    const items: UploadItem[] = files.map((f) => ({
+      name: f.name,
+      progress: 0,
+      status: "pending" as const,
+    }));
+    setUploadItems(items);
     setUploading(true);
-    try {
-      for (const file of Array.from(fileList)) {
-        await uploadFile(file, currentFolder);
+
+    for (let i = 0; i < files.length; i++) {
+      setUploadItems((prev) => {
+        const next = [...prev];
+        next[i] = { ...next[i], status: "uploading" };
+        return next;
+      });
+
+      try {
+        await uploadFileWithProgress(
+          files[i],
+          currentFolder,
+          (loaded, total) => {
+            const pct = Math.round((loaded / total) * 100);
+            setUploadItems((prev) => {
+              const next = [...prev];
+              next[i] = { ...next[i], progress: pct };
+              return next;
+            });
+          },
+        );
+        setUploadItems((prev) => {
+          const next = [...prev];
+          next[i] = { ...next[i], status: "done", progress: 100 };
+          return next;
+        });
+      } catch (err) {
+        setUploadItems((prev) => {
+          const next = [...prev];
+          next[i] = {
+            ...next[i],
+            status: "error",
+            error: err instanceof Error ? err.message : "Upload failed",
+          };
+          return next;
+        });
       }
-      await loadFiles();
-    } catch (err) {
-      console.error("Upload failed:", err);
-    } finally {
-      setUploading(false);
     }
+
+    await loadFiles();
+    setUploading(false);
   };
 
   const handleDelete = async (fileId: string) => {
@@ -333,6 +376,10 @@ export default function FilesPage() {
       </footer>
 
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+      <UploadProgressOverlay
+        items={uploadItems}
+        onClose={() => setUploadItems([])}
+      />
     </div>
   );
 }

@@ -15,7 +15,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const userId = params.id as string;
 
   const user = await env.DB.prepare(
-    "SELECT id, display_name, bio, avatar_url, created_at FROM users WHERE id = ?"
+    "SELECT id, display_name, bio, avatar_url, created_at FROM users WHERE id = ?",
   )
     .bind(userId)
     .first();
@@ -25,7 +25,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 
   // Get user's public songs
-  const { results: songs } = await env.DB.prepare(`
+  const { results: songs } = await env.DB.prepare(
+    `
     SELECT s.*,
       COALESCE(AVG(r.score), 0) as avg_rating,
       COUNT(DISTINCT r.user_id) as rating_count,
@@ -36,17 +37,20 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     WHERE s.user_id = ? AND s.is_public = 1
     GROUP BY s.id
     ORDER BY s.created_at DESC
-  `)
+  `,
+  )
     .bind(userId)
     .all();
 
   // Get stats
-  const stats = await env.DB.prepare(`
+  const stats = await env.DB.prepare(
+    `
     SELECT
       COUNT(*) as song_count,
       COALESCE(SUM(play_count), 0) as total_plays
     FROM songs WHERE user_id = ? AND is_public = 1
-  `)
+  `,
+  )
     .bind(userId)
     .first<{ song_count: number; total_plays: number }>();
 
@@ -99,14 +103,12 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   updates.push("updated_at = datetime('now')");
   values.push(userId);
 
-  await env.DB.prepare(
-    `UPDATE users SET ${updates.join(", ")} WHERE id = ?`
-  )
+  await env.DB.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`)
     .bind(...values)
     .run();
 
   const updated = await env.DB.prepare(
-    "SELECT id, display_name, bio, avatar_url, created_at, updated_at FROM users WHERE id = ?"
+    "SELECT id, display_name, bio, avatar_url, created_at, updated_at FROM users WHERE id = ?",
   )
     .bind(userId)
     .first();
