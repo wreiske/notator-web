@@ -1,8 +1,8 @@
 //! Standard MIDI File (SMF Type 1) writer.
 //!
 //! Exports a SongData to a complete .mid file with:
-//!   Track 0 = conductor (tempo, time sig, song name)
-//!   Tracks 1..N = MIDI data per channel
+//!   Track 0 = conductor (tempo map, time sig, song name)
+//!   Tracks 1..N = MIDI data per Notator track (preserving track names)
 
 use crate::types::*;
 
@@ -12,30 +12,43 @@ pub fn export_song_to_midi(song: &SongData, song_name: &str) -> Vec<u8> {
 
     let mut track_chunks: Vec<Vec<u8>> = Vec::new();
 
-    // Track 0: Conductor
+    // Track 0: Conductor (tempo map + time signature)
     track_chunks.push(build_conductor_track(song, song_name));
 
-    // Data tracks
-    for (ch, events) in &flat_tracks {
-        if events.is_empty() {
+    // Data tracks — grouped by Notator track (track_index + name)
+    for flat_track in &flat_tracks {
+        if flat_track.events.is_empty() {
             continue;
         }
-        let track_name = format!("Ch {}", ch + 1);
-        track_chunks.push(build_midi_track(events, *ch, &track_name, song));
+        track_chunks.push(build_midi_track(
+            &flat_track.events,
+            flat_track.channel,
+            &flat_track.name,
+            song,
+        ));
     }
 
     build_smf_file(song.ticks_per_beat, &track_chunks)
 }
 
-/// Flatten the arrangement into per-channel event lists with absolute ticks.
-fn flatten_arrangement(song: &SongData) -> Vec<(u8, Vec<FlatEvent>)> {
-    let mut channel_events: Vec<Vec<FlatEvent>> = (0..16).map(|_| Vec::new()).collect();
+/// A flattened track with events at absolute tick positions.
+struct FlatTrack {
+    /// Notator track name (e.g., "kick", "snare")
+    name: String,
+    /// MIDI channel
+    channel: u8,
+    /// Events sorted by absolute tick
+    events: Vec<FlatEvent>,
+}
 
-    let ticks_per_bar = if song.ticks_per_measure > 0 {
-        song.ticks_per_measure as u32
-    } else {
-        768
-    };
+/// Flatten the arrangement into per-Notator-track event lists with absolute ticks.
+///
+/// Groups by (track_index, track_name) to preserve the original Notator
+/// track structure, rather than merging by MIDI channel.
+fn flatten_arrangement(song: &SongData) -> Vec<FlatTrack> {
+    // Track key: (track_index_within_pattern, track_name)
+    // We need stable ordering, so use a Vec of (key, events)
+    let mut track_map: Vec<(u8, String, u8, Vec<FlatEvent>)> = Vec::new(); // (track_idx, name, channel, events)
 
     for entry in &song.arrangement {
         let pattern = song
@@ -47,34 +60,58 @@ fn flatten_arrangement(song: &SongData) -> Vec<(u8, Vec<FlatEvent>)> {
             None => continue,
         };
 
-        let bar_offset = (entry.bar.saturating_sub(1)) * ticks_per_bar;
-        let max_ticks = entry.length * ticks_per_bar;
+        // Use tick_position for precise absolute offset
+        let tick_offset = entry.tick_position;
+        let max_ticks = entry.length_ticks;
 
         for track in &pattern.tracks {
-            let ch = (track.channel as usize) & 0x0F;
+            let ch = track.channel & 0x0F;
+            let track_idx = track.track_index;
+            let track_name = track.name.clone();
+
+            // Find or create the flat track entry
+            let flat_track = track_map
+                .iter_mut()
+                .find(|(idx, name, _, _)| *idx == track_idx && *name == track_name);
+
+            let events_vec = if let Some((_, _, _, events)) = flat_track {
+                events
+            } else {
+                track_map.push((track_idx, track_name.clone(), ch, Vec::new()));
+                &mut track_map.last_mut().unwrap().3
+            };
+
             for event in &track.events {
                 let tick = event.tick() as u32;
-                if tick < max_ticks {
-                    channel_events[ch].push(FlatEvent {
-                        abs_tick: bar_offset + tick,
-                        event: event.clone(),
-                    });
+                if max_ticks > 0 && tick >= max_ticks {
+                    continue; // Skip events beyond this entry's duration
                 }
+                events_vec.push(FlatEvent {
+                    abs_tick: tick_offset + tick,
+                    event: event.clone(),
+                });
             }
         }
     }
 
-    // Sort each channel by absolute tick
-    for events in &mut channel_events {
+    // Sort each track's events by absolute tick
+    let mut result = Vec::new();
+    for (_, name, channel, mut events) in track_map {
         events.sort_by_key(|e| e.abs_tick);
+        if !events.is_empty() {
+            result.push(FlatTrack {
+                name: if name.trim().is_empty() {
+                    format!("Ch {}", channel + 1)
+                } else {
+                    name
+                },
+                channel,
+                events,
+            });
+        }
     }
 
-    channel_events
-        .into_iter()
-        .enumerate()
-        .filter(|(_, events)| !events.is_empty())
-        .map(|(ch, events)| (ch as u8, events))
-        .collect()
+    result
 }
 
 struct FlatEvent {
@@ -82,27 +119,18 @@ struct FlatEvent {
     event: TrackEvent,
 }
 
-/// Build the conductor track (Track 0).
+/// Build the conductor track (Track 0) with tempo map and time signature.
 fn build_conductor_track(song: &SongData, song_name: &str) -> Vec<u8> {
-    let mut events = Vec::new();
+    let mut events: Vec<(u32, Vec<u8>)> = Vec::new(); // (abs_tick, event_data)
 
-    // Song name meta-event (FF 03)
+    // Song name meta-event (FF 03) at tick 0
     let name_bytes = song_name.as_bytes();
-    events.extend_from_slice(&vlq(0));
-    events.extend_from_slice(&[0xFF, 0x03]);
-    events.extend_from_slice(&vlq(name_bytes.len() as u32));
-    events.extend_from_slice(name_bytes);
+    let mut name_event = vec![0xFF, 0x03];
+    name_event.extend_from_slice(&vlq(name_bytes.len() as u32));
+    name_event.extend_from_slice(name_bytes);
+    events.push((0, name_event));
 
-    // Tempo meta-event (FF 51 03)
-    let tempo = if song.tempo > 0 { song.tempo } else { 120 };
-    let us_per_beat = (60_000_000u32) / (tempo as u32);
-    events.extend_from_slice(&vlq(0));
-    events.extend_from_slice(&[0xFF, 0x51, 0x03]);
-    events.push(((us_per_beat >> 16) & 0xFF) as u8);
-    events.push(((us_per_beat >> 8) & 0xFF) as u8);
-    events.push((us_per_beat & 0xFF) as u8);
-
-    // Time signature meta-event (FF 58 04)
+    // Time signature meta-event (FF 58 04) at tick 0
     let tpm = if song.ticks_per_measure > 0 {
         song.ticks_per_measure
     } else {
@@ -114,15 +142,60 @@ fn build_conductor_track(song: &SongData, song_name: &str) -> Vec<u8> {
         192
     };
     let beats_per_bar = (tpm as f32 / tpb as f32).round() as u8;
-    events.extend_from_slice(&vlq(0));
-    events.extend_from_slice(&[0xFF, 0x58, 0x04]);
-    events.extend_from_slice(&[beats_per_bar, 2, 24, 8]);
+    events.push((0, vec![0xFF, 0x58, 0x04, beats_per_bar, 2, 24, 8]));
+
+    // Tempo events from tempo map
+    if song.tempo_map.is_empty() {
+        // Fallback: single tempo from header
+        let tempo = if song.tempo > 0 { song.tempo } else { 120 };
+        let us_per_beat = 60_000_000u32 / (tempo as u32);
+        events.push((
+            0,
+            vec![
+                0xFF,
+                0x51,
+                0x03,
+                ((us_per_beat >> 16) & 0xFF) as u8,
+                ((us_per_beat >> 8) & 0xFF) as u8,
+                (us_per_beat & 0xFF) as u8,
+            ],
+        ));
+    } else {
+        for tc in &song.tempo_map {
+            let bpm = if tc.bpm > 0 { tc.bpm } else { 120 };
+            let us_per_beat = 60_000_000u32 / (bpm as u32);
+            events.push((
+                tc.tick,
+                vec![
+                    0xFF,
+                    0x51,
+                    0x03,
+                    ((us_per_beat >> 16) & 0xFF) as u8,
+                    ((us_per_beat >> 8) & 0xFF) as u8,
+                    (us_per_beat & 0xFF) as u8,
+                ],
+            ));
+        }
+    }
+
+    // Sort by tick
+    events.sort_by_key(|(tick, _)| *tick);
+
+    // Build track data with delta times
+    let mut data = Vec::new();
+    let mut last_tick: u32 = 0;
+    for (tick, event_data) in &events {
+        let delta = tick.saturating_sub(last_tick);
+        last_tick = *tick;
+        data.extend_from_slice(&vlq(delta));
+        data.extend_from_slice(event_data);
+    }
 
     // End of track
-    events.extend_from_slice(&vlq(0));
-    events.extend_from_slice(&[0xFF, 0x2F, 0x00]);
+    data.extend_from_slice(&vlq(0));
+    data.extend_from_slice(&[0xFF, 0x2F, 0x00]);
 
-    wrap_track_chunk(&events)
+    wrap_track_chunk(&data)
 }
 
 /// Build a MIDI data track from flat events.

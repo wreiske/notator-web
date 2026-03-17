@@ -121,23 +121,51 @@ pub fn parse_arrangement(
                 pattern_index: (a_col as usize) - 1,
                 bar,
                 length: 1, // Will be recomputed below
+                tick_position: tick_pos,
+                length_ticks: 0, // Will be recomputed below
                 name: display_name,
-                columns: ArrangementColumns { a: a_col, b: 0, c: 0, d: 0 },
+                columns: ArrangementColumns {
+                    a: a_col,
+                    b: 0,
+                    c: 0,
+                    d: 0,
+                },
             });
         }
 
-        // Compute bar lengths from consecutive entry positions
+        // Compute bar lengths and tick durations from consecutive entries
         for i in 0..entries.len().saturating_sub(1) {
             entries[i].length = entries[i + 1].bar - entries[i].bar;
+            entries[i].length_ticks = entries[i + 1]
+                .tick_position
+                .saturating_sub(entries[i].tick_position);
         }
         // Set last entry length
         if !entries.is_empty() {
-            let last_len = if entries.len() > 1 {
-                entries[entries.len() - 2].length.max(1)
+            let last_idx = entries.len() - 1;
+            if entries.len() > 1 {
+                let prev_len = entries[last_idx - 1].length.max(1);
+                let prev_ticks = entries[last_idx - 1].length_ticks;
+                entries[last_idx].length = prev_len;
+                // For last entry, use the referenced pattern's total_ticks if available,
+                // otherwise fall back to the previous entry's tick duration
+                let pat = patterns
+                    .iter()
+                    .find(|p| p.index == entries[last_idx].pattern_index);
+                entries[last_idx].length_ticks =
+                    pat.map(|p| p.total_ticks).unwrap_or(if prev_ticks > 0 {
+                        prev_ticks
+                    } else {
+                        prev_len * ticks_per_bar
+                    });
             } else {
-                4
-            };
-            entries.last_mut().unwrap().length = last_len;
+                entries[last_idx].length = 4;
+                let pat = patterns
+                    .iter()
+                    .find(|p| p.index == entries[last_idx].pattern_index);
+                entries[last_idx].length_ticks =
+                    pat.map(|p| p.total_ticks).unwrap_or(4 * ticks_per_bar);
+            }
         }
     }
 
@@ -154,12 +182,20 @@ pub fn parse_arrangement(
                 continue;
             }
             let bar_length = ((pat.total_ticks + tpm - 1) / tpm).max(1);
+            let tick_pos = (bar - 1) * tpm;
             entries.push(ArrangementEntry {
                 pattern_index: pat.index,
                 bar,
                 length: bar_length,
+                tick_position: tick_pos,
+                length_ticks: pat.total_ticks,
                 name: pat.name.clone(),
-                columns: ArrangementColumns { a: (pat.index + 1) as u8, b: 0, c: 0, d: 0 },
+                columns: ArrangementColumns {
+                    a: (pat.index + 1) as u8,
+                    b: 0,
+                    c: 0,
+                    d: 0,
+                },
             });
             bar += bar_length;
         }

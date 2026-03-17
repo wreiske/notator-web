@@ -168,6 +168,14 @@ export interface TrackConfig {
 // PLAYBACK-ORIENTED TYPES (backward compat)
 // ═══════════════════════════════════════════════════════════════════════
 
+/** A tempo change event extracted from pattern data */
+export interface TempoChange {
+  /** Absolute tick position of this tempo change */
+  tick: number;
+  /** New tempo in BPM */
+  bpm: number;
+}
+
 /** Top-level song data for playback/UI (derived from SonFile) */
 export interface SongData {
   tracks: Track[];
@@ -184,6 +192,8 @@ export interface SongData {
   headerConfig: HeaderConfig;
   /** Track-to-group mapping */
   trackGroups: TrackGroupMapping;
+  /** Tempo map: list of tempo changes across the song, sorted by tick */
+  tempoMap: TempoChange[];
 }
 
 export interface ArrangementEntry {
@@ -193,6 +203,10 @@ export interface ArrangementEntry {
   bar: number;
   /** Length of this entry in bars */
   length: number;
+  /** Absolute tick position from the arrangement table (20-bit) */
+  tickPosition: number;
+  /** Duration in ticks (derived from consecutive entry tick positions) */
+  lengthTicks: number;
   /** Display name (arrangement name or pattern name) */
   name: string;
   /** Pattern columns a/b/c/d — 1-based pattern indices (0 = unused) */

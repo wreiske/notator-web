@@ -56,9 +56,7 @@ fn main() {
         // Determine output path
         let out_path = if let Some(ref out_dir) = output_dir {
             let rel_mid = if target.is_dir() {
-                sf.strip_prefix(target)
-                    .unwrap_or(sf)
-                    .with_extension("mid")
+                sf.strip_prefix(target).unwrap_or(sf).with_extension("mid")
             } else {
                 PathBuf::from(sf.file_name().unwrap_or_default()).with_extension("mid")
             };
@@ -145,11 +143,7 @@ fn convert_file(son_path: &Path, mid_path: &Path) -> Result<String, String> {
                 magic
             ));
         }
-        return Err(format!(
-            "Too small ({} bytes, need {})",
-            raw.len(),
-            0x5AC8
-        ));
+        return Err(format!("Too small ({} bytes, need {})", raw.len(), 0x5AC8));
     }
 
     let song = parse_song_data(&raw).map_err(|e| format!("Parse error: {}", e))?;

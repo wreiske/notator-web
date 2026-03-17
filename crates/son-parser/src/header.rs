@@ -49,11 +49,19 @@ pub fn parse_header(data: &[u8]) -> SonHeader {
     let magic = u16be(data, 0);
     let tempo = {
         let t = u16be(data, TEMPO_OFFSET);
-        if t == 0 { 120 } else { t }
+        if t == 0 {
+            120
+        } else {
+            t
+        }
     };
     let ticks_per_measure = {
         let t = u16be(data, TICKS_PER_MEASURE_OFFSET);
-        if t == 0 { 768 } else { t }
+        if t == 0 {
+            768
+        } else {
+            t
+        }
     };
     let ticks_per_beat = ticks_per_measure / 4;
 
@@ -118,7 +126,10 @@ mod tests {
 
     #[test]
     fn test_decode_ascii() {
-        assert_eq!(decode_ascii(&[b'k', b'i', b'c', b'k', 0, 0, 0, 0], 0, 8), "kick");
+        assert_eq!(
+            decode_ascii(&[b'k', b'i', b'c', b'k', 0, 0, 0, 0], 0, 8),
+            "kick"
+        );
         assert_eq!(decode_ascii(&[b' ', b' ', 0, 0], 0, 4), "");
         assert_eq!(decode_ascii(&[b'A', 0xFF, b'B', 0], 0, 4), "A B");
     }

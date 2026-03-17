@@ -173,7 +173,7 @@ export function TransportBar({
 
       {/* Top: menu bar + branding */}
       <div className="flex items-center justify-between border-b border-notator-border px-1 py-0 text-[11px]">
-        <div className="min-w-0 overflow-x-auto">
+        <div className="min-w-0 overflow-visible">
           <MenuBar menus={menus} />
         </div>
         <div className="hidden items-center gap-2 pr-2 sm:flex">

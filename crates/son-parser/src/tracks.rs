@@ -118,7 +118,22 @@ pub fn is_empty_pointer(ptr: u32) -> bool {
     ptr == EMPTY_TRACK_POINTER || ptr == 0
 }
 
+/// Notator's internal pattern tick offset.
+///
+/// Notator stores all event positions with a fixed 7680-tick offset
+/// (= 10 bars of 4/4 time at 768 ticks/bar = 40 quarter-note beats).
+/// The first 10 "virtual bars" are used for internal setup/precount data.
+/// Musical content starts at tick 7680 (= bar 1 from the user's perspective).
+///
+/// We subtract this offset during conversion to TrackEvent so that
+/// bar 1 starts at tick 0 for playback and MIDI export.
+pub const PATTERN_TICK_OFFSET: u16 = 7680;
+
 /// Convert a TrackSlot to a playable Track (or None if no playable events).
+///
+/// Subtracts the Notator pattern tick offset (7680) from all event ticks
+/// so that bar 1 starts at tick 0 in the output. Events in the setup
+/// region (before tick 7680) are dropped.
 pub fn slot_to_track(slot: &TrackSlot, track_index: u8, header: &SonHeader) -> Option<Track> {
     if !slot.has_playable_events {
         return None;
@@ -128,6 +143,11 @@ pub fn slot_to_track(slot: &TrackSlot, track_index: u8, header: &SonHeader) -> O
         .events
         .iter()
         .filter_map(|e| e.to_track_event())
+        .filter(|e| e.tick() >= PATTERN_TICK_OFFSET)
+        .map(|e| {
+            let new_tick = e.tick() - PATTERN_TICK_OFFSET;
+            e.with_tick(new_tick)
+        })
         .collect();
 
     if midi_events.is_empty() {
@@ -144,23 +164,15 @@ pub fn slot_to_track(slot: &TrackSlot, track_index: u8, header: &SonHeader) -> O
         channel = slot.config.midi_channel - 1;
     } else {
         let idx = track_index as usize;
-        if idx < header.channel_config.channels.len()
-            && header.channel_config.channels[idx] <= 15
-        {
+        if idx < header.channel_config.channels.len() && header.channel_config.channels[idx] <= 15 {
             channel = header.channel_config.channels[idx];
         }
     }
 
     // Drums detection
     let is_drums = channel == 9
-        || slot
-            .name
-            .to_lowercase()
-            .contains("drum")
-        || slot
-            .name
-            .to_lowercase()
-            .contains("percuss")
+        || slot.name.to_lowercase().contains("drum")
+        || slot.name.to_lowercase().contains("percuss")
         || track_index == 9;
     if is_drums {
         channel = 9;

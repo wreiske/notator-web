@@ -43,7 +43,10 @@ fn test_deadnite_header_magic() {
 fn test_deadnite_tempo() {
     let data = load_deadnite();
     let son = son_parser::parse_son_file(&data).expect("parse failed");
-    assert_eq!(son.header.tempo, 68, "Tempo should be 68 BPM (from screenshot)");
+    assert_eq!(
+        son.header.tempo, 68,
+        "Tempo should be 68 BPM (from screenshot)"
+    );
 }
 
 #[test]
@@ -76,13 +79,18 @@ fn test_deadnite_pattern1_track_names() {
     let song = son_parser::parse_song_data(&data).expect("parse failed");
 
     // Find pattern index 0 (= "Pattern 1" in Notator)
-    let pat = song.patterns.iter().find(|p| p.index == 0).expect("Pattern 0 not found");
+    let pat = song
+        .patterns
+        .iter()
+        .find(|p| p.index == 0)
+        .expect("Pattern 0 not found");
 
     // Screenshot shows these track names for Pattern 1:
     let expected_names = [
-        "kick", "snare", "toms", // tracks 1-3
-        // track 4 "hat" may be empty in this pattern
-        // track 5 "crash"
+        "kick", "snare",
+        "toms", // tracks 1-3
+               // track 4 "hat" may be empty in this pattern
+               // track 5 "crash"
     ];
 
     // Verify track 1 = kick
@@ -112,7 +120,11 @@ fn test_deadnite_pattern1_channels() {
     let data = load_deadnite();
     let song = son_parser::parse_song_data(&data).expect("parse failed");
 
-    let pat = song.patterns.iter().find(|p| p.index == 0).expect("Pattern 0 not found");
+    let pat = song
+        .patterns
+        .iter()
+        .find(|p| p.index == 0)
+        .expect("Pattern 0 not found");
 
     // Screenshot: Track 1 (kick) → Channel A 9 → 0-indexed = 8
     assert_eq!(
@@ -317,7 +329,11 @@ fn test_deadnite_pattern1_has_kick_notes() {
     let data = load_deadnite();
     let song = son_parser::parse_song_data(&data).expect("parse failed");
 
-    let pat = song.patterns.iter().find(|p| p.index == 0).expect("Pattern 0 not found");
+    let pat = song
+        .patterns
+        .iter()
+        .find(|p| p.index == 0)
+        .expect("Pattern 0 not found");
     let kick = &pat.tracks[0]; // Track 1 = kick
     let note_count = kick
         .events
@@ -338,17 +354,34 @@ fn test_deadnite_pattern1_has_kick_notes() {
 
 #[test]
 fn test_all_fixtures_parse_successfully() {
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let result = son_parser::parse_son_file(&data);
-        assert!(result.is_ok(), "{} failed to parse: {:?}", name, result.err());
+        assert!(
+            result.is_ok(),
+            "{} failed to parse: {:?}",
+            name,
+            result.err()
+        );
     }
 }
 
 #[test]
 fn test_all_fixtures_have_magic() {
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let son = son_parser::parse_son_file(&data).unwrap();
@@ -358,7 +391,13 @@ fn test_all_fixtures_have_magic() {
 
 #[test]
 fn test_all_fixtures_have_valid_tempo() {
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let son = son_parser::parse_son_file(&data).unwrap();
@@ -373,7 +412,13 @@ fn test_all_fixtures_have_valid_tempo() {
 
 #[test]
 fn test_all_fixtures_have_valid_ticks_per_measure() {
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let son = son_parser::parse_son_file(&data).unwrap();
@@ -389,21 +434,29 @@ fn test_all_fixtures_have_valid_ticks_per_measure() {
 
 #[test]
 fn test_all_fixtures_have_patterns() {
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let song = son_parser::parse_song_data(&data).unwrap();
-        assert!(
-            !song.patterns.is_empty(),
-            "{} has no patterns",
-            name
-        );
+        assert!(!song.patterns.is_empty(), "{} has no patterns", name);
     }
 }
 
 #[test]
 fn test_all_fixtures_have_16_tracks_per_pattern() {
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let song = son_parser::parse_song_data(&data).unwrap();
@@ -436,7 +489,10 @@ fn test_alexas_time_signature() {
     let data = load_alexas();
     let son = son_parser::parse_son_file(&data).unwrap();
     // ALEXA'S uses 1536 ticks/measure (8/4 or compound time)
-    assert_eq!(son.header.ticks_per_measure, 1536, "ALEXA'S should be 1536 ticks/measure");
+    assert_eq!(
+        son.header.ticks_per_measure, 1536,
+        "ALEXA'S should be 1536 ticks/measure"
+    );
 }
 
 #[test]
@@ -450,7 +506,11 @@ fn test_alexas_has_notes() {
         .flat_map(|t| &t.events)
         .filter(|e| matches!(e, TrackEvent::NoteOn(_)))
         .count();
-    assert!(total_notes > 0, "ALEXA'S should have note events, got {}", total_notes);
+    assert!(
+        total_notes > 0,
+        "ALEXA'S should have note events, got {}",
+        total_notes
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -459,7 +519,13 @@ fn test_alexas_has_notes() {
 
 #[test]
 fn test_velocity_range_all_files() {
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let song = son_parser::parse_song_data(&data).unwrap();
@@ -487,7 +553,13 @@ fn test_note_values_are_in_byte_range() {
     // in special contexts (e.g., drum maps, transposed ranges). We verify they
     // are valid u8 values — the parser stores them as u8 so this is inherently true,
     // but we verify no panic occurs during parsing.
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let song = son_parser::parse_song_data(&data).unwrap();
@@ -498,8 +570,12 @@ fn test_note_values_are_in_byte_range() {
             .flat_map(|t| &t.events)
             .filter(|e| matches!(e, TrackEvent::NoteOn(_) | TrackEvent::NoteOff(_)))
             .count();
-        // Each fixture should have at least some note events
-        assert!(total_notes > 0, "{} should have note events", name);
+        // AUTOLOAD.SON is a config-only file — all its events are in the
+        // Notator setup region (before tick 7680), so no notes remain after
+        // offset adjustment. Other fixtures should have notes.
+        if *name != "AUTOLOAD.SON" {
+            assert!(total_notes > 0, "{} should have note events", name);
+        }
     }
 }
 
@@ -567,12 +643,26 @@ fn test_all_fixtures_export_valid_midi() {
             filename
         );
         // Header length = 6
-        assert_eq!(&midi[4..8], &[0, 0, 0, 6], "{} MIDI header length wrong", filename);
+        assert_eq!(
+            &midi[4..8],
+            &[0, 0, 0, 6],
+            "{} MIDI header length wrong",
+            filename
+        );
         // Format type 1
-        assert_eq!(&midi[8..10], &[0, 1], "{} should be MIDI format 1", filename);
+        assert_eq!(
+            &midi[8..10],
+            &[0, 1],
+            "{} should be MIDI format 1",
+            filename
+        );
         // Must contain at least one MTrk
         let has_mtrk = midi.windows(4).any(|w| w == b"MTrk");
-        assert!(has_mtrk, "{} MIDI output must contain at least one MTrk", filename);
+        assert!(
+            has_mtrk,
+            "{} MIDI output must contain at least one MTrk",
+            filename
+        );
     }
 }
 
@@ -622,20 +712,52 @@ fn test_event_ticks_are_monotonic_per_track() {
 
 #[test]
 fn test_channel_config_arrays_are_16_elements() {
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let son = son_parser::parse_son_file(&data).unwrap();
-        assert_eq!(son.header.channel_config.channels.len(), 16, "{} channels array", name);
-        assert_eq!(son.header.channel_config.programs.len(), 16, "{} programs array", name);
-        assert_eq!(son.header.channel_config.volumes.len(), 16, "{} volumes array", name);
-        assert_eq!(son.header.channel_config.pans.len(), 16, "{} pans array", name);
+        assert_eq!(
+            son.header.channel_config.channels.len(),
+            16,
+            "{} channels array",
+            name
+        );
+        assert_eq!(
+            son.header.channel_config.programs.len(),
+            16,
+            "{} programs array",
+            name
+        );
+        assert_eq!(
+            son.header.channel_config.volumes.len(),
+            16,
+            "{} volumes array",
+            name
+        );
+        assert_eq!(
+            son.header.channel_config.pans.len(),
+            16,
+            "{} pans array",
+            name
+        );
     }
 }
 
 #[test]
 fn test_boundaries_exist_in_all_files() {
-    let fixtures = ["DEADNITE.SON", "ALEXA'S.SON", "EXAMPLE.SON", "DRUMMAP.SON", "AUTOLOAD.SON"];
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
     for name in &fixtures {
         let data = load_fixture(name);
         let son = son_parser::parse_son_file(&data).unwrap();
@@ -645,4 +767,174 @@ fn test_boundaries_exist_in_all_files() {
             name
         );
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ARRANGEMENT TICK POSITION TESTS
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_deadnite_arrangement_tick_positions_populated() {
+    let data = load_deadnite();
+    let song = son_parser::parse_song_data(&data).expect("parse failed");
+
+    // All arrangement entries should have tick_position populated
+    for (i, entry) in song.arrangement.iter().enumerate() {
+        // First entry can be at tick 0 or later
+        if i > 0 {
+            assert!(
+                entry.tick_position > 0,
+                "Entry {} ('{}') should have tick_position > 0, got {}",
+                i,
+                entry.name,
+                entry.tick_position
+            );
+        }
+    }
+}
+
+#[test]
+fn test_deadnite_arrangement_tick_positions_monotonic() {
+    let data = load_deadnite();
+    let song = son_parser::parse_song_data(&data).expect("parse failed");
+
+    // Tick positions should be monotonically increasing
+    for i in 1..song.arrangement.len() {
+        assert!(
+            song.arrangement[i].tick_position >= song.arrangement[i - 1].tick_position,
+            "Entry {} tick {} is less than entry {} tick {}",
+            i,
+            song.arrangement[i].tick_position,
+            i - 1,
+            song.arrangement[i - 1].tick_position
+        );
+    }
+}
+
+#[test]
+fn test_deadnite_arrangement_length_ticks_from_differences() {
+    let data = load_deadnite();
+    let song = son_parser::parse_song_data(&data).expect("parse failed");
+
+    // For entries 0..n-1, length_ticks should equal the difference between consecutive tick_positions
+    for i in 0..song.arrangement.len().saturating_sub(1) {
+        let expected = song.arrangement[i + 1].tick_position - song.arrangement[i].tick_position;
+        assert_eq!(
+            song.arrangement[i].length_ticks, expected,
+            "Entry {} length_ticks should be {}, got {}",
+            i, expected, song.arrangement[i].length_ticks
+        );
+    }
+}
+
+#[test]
+fn test_all_fixtures_arrangement_has_tick_positions() {
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
+    for name in &fixtures {
+        let data = load_fixture(name);
+        let song = son_parser::parse_song_data(&data).unwrap();
+        for (i, entry) in song.arrangement.iter().enumerate() {
+            assert!(
+                entry.length_ticks > 0,
+                "{} arrangement entry {} ('{}') should have length_ticks > 0, got {}",
+                name,
+                i,
+                entry.name,
+                entry.length_ticks
+            );
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEMPO MAP TESTS
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_deadnite_tempo_map_has_header_tempo() {
+    let data = load_deadnite();
+    let song = son_parser::parse_song_data(&data).expect("parse failed");
+
+    // Tempo map should always have at least 1 entry (the header tempo)
+    assert!(!song.tempo_map.is_empty(), "Tempo map should not be empty");
+
+    // First entry should be at tick 0 with header tempo
+    assert_eq!(song.tempo_map[0].tick, 0);
+    assert_eq!(song.tempo_map[0].bpm, song.tempo);
+}
+
+#[test]
+fn test_all_fixtures_have_tempo_map() {
+    let fixtures = [
+        "DEADNITE.SON",
+        "ALEXA'S.SON",
+        "EXAMPLE.SON",
+        "DRUMMAP.SON",
+        "AUTOLOAD.SON",
+    ];
+    for name in &fixtures {
+        let data = load_fixture(name);
+        let song = son_parser::parse_song_data(&data).unwrap();
+        assert!(
+            !song.tempo_map.is_empty(),
+            "{} should have at least one tempo map entry",
+            name
+        );
+        // First entry should match header tempo
+        assert_eq!(
+            song.tempo_map[0].bpm, song.tempo,
+            "{} first tempo map entry should match header tempo",
+            name
+        );
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MIDI EXPORT TRACK NAME TESTS
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_deadnite_midi_export_has_track_name_meta() {
+    let data = load_deadnite();
+    let song = son_parser::parse_song_data(&data).expect("parse failed");
+    let midi = son_parser::export_to_midi(&song, "DEADNITE");
+
+    // Look for FF 03 (track name) meta-events in the MIDI output
+    let mut found_track_name = false;
+    for i in 0..midi.len().saturating_sub(2) {
+        if midi[i] == 0xFF && midi[i + 1] == 0x03 {
+            found_track_name = true;
+            break;
+        }
+    }
+    assert!(
+        found_track_name,
+        "MIDI output should contain track name meta-events (FF 03)"
+    );
+}
+
+#[test]
+fn test_deadnite_midi_export_has_tempo_meta() {
+    let data = load_deadnite();
+    let song = son_parser::parse_song_data(&data).expect("parse failed");
+    let midi = son_parser::export_to_midi(&song, "DEADNITE");
+
+    // Look for FF 51 03 (tempo) meta-events in the MIDI output
+    let mut found_tempo = false;
+    for i in 0..midi.len().saturating_sub(3) {
+        if midi[i] == 0xFF && midi[i + 1] == 0x51 && midi[i + 2] == 0x03 {
+            found_tempo = true;
+            break;
+        }
+    }
+    assert!(
+        found_tempo,
+        "MIDI output should contain tempo meta-events (FF 51 03)"
+    );
 }

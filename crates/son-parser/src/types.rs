@@ -188,6 +188,16 @@ pub enum BoundaryType {
 // PLAYBACK-ORIENTED TYPES
 // ═══════════════════════════════════════════════════════════════════════
 
+/// A tempo change event extracted from pattern data.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "wasm", derive(Serialize))]
+pub struct TempoChange {
+    /// Absolute tick position of this tempo change
+    pub tick: u32,
+    /// New tempo in BPM
+    pub bpm: u16,
+}
+
 /// Top-level song data for playback/UI (derived from SonFile).
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "wasm", derive(Serialize))]
@@ -205,6 +215,8 @@ pub struct SongData {
     pub channel_config: ChannelConfig,
     pub header_config: HeaderConfig,
     pub track_groups: TrackGroupMapping,
+    /// Tempo map: list of tempo changes across the song, sorted by tick
+    pub tempo_map: Vec<TempoChange>,
 }
 
 /// A playable track (derived from TrackSlot for playback).
@@ -253,6 +265,10 @@ pub struct ArrangementEntry {
     pub bar: u32,
     /// Length in bars
     pub length: u32,
+    /// Absolute tick position from the arrangement table (20-bit)
+    pub tick_position: u32,
+    /// Duration in ticks (derived from consecutive entry tick positions)
+    pub length_ticks: u32,
     /// Display name
     pub name: String,
     /// Pattern columns a/b/c/d (1-based, 0 = unused)
@@ -316,6 +332,44 @@ impl TrackEvent {
             TrackEvent::ChannelPressure(e) => e.tick,
             TrackEvent::PitchWheel(e) => e.tick,
             TrackEvent::SysEx(e) => e.tick,
+        }
+    }
+
+    /// Return a copy of this event with a new tick value.
+    pub fn with_tick(self, new_tick: u16) -> TrackEvent {
+        match self {
+            TrackEvent::NoteOn(mut e) => {
+                e.tick = new_tick;
+                TrackEvent::NoteOn(e)
+            }
+            TrackEvent::NoteOff(mut e) => {
+                e.tick = new_tick;
+                TrackEvent::NoteOff(e)
+            }
+            TrackEvent::Aftertouch(mut e) => {
+                e.tick = new_tick;
+                TrackEvent::Aftertouch(e)
+            }
+            TrackEvent::ControlChange(mut e) => {
+                e.tick = new_tick;
+                TrackEvent::ControlChange(e)
+            }
+            TrackEvent::ProgramChange(mut e) => {
+                e.tick = new_tick;
+                TrackEvent::ProgramChange(e)
+            }
+            TrackEvent::ChannelPressure(mut e) => {
+                e.tick = new_tick;
+                TrackEvent::ChannelPressure(e)
+            }
+            TrackEvent::PitchWheel(mut e) => {
+                e.tick = new_tick;
+                TrackEvent::PitchWheel(e)
+            }
+            TrackEvent::SysEx(mut e) => {
+                e.tick = new_tick;
+                TrackEvent::SysEx(e)
+            }
         }
     }
 }

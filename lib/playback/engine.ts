@@ -13,6 +13,7 @@ import type {
   SongData,
   TrackEvent,
   ArrangementEntry,
+  TempoChange,
 } from "@/lib/son-parser/types";
 import { SynthFallback } from "@/lib/midi/synth-fallback";
 import {
@@ -66,6 +67,9 @@ export class PlaybackEngine {
   private loopEnabled: boolean = false;
   private useArrangement: boolean = false;
 
+  // Tempo map
+  private tempoMap: TempoChange[] = [];
+
   // Loop region (for piano roll / scrubber)
   private loopRegionStart: number = -1;
   private loopRegionEnd: number = -1;
@@ -106,6 +110,12 @@ export class PlaybackEngine {
     this.stop();
     this.song = song;
     this.tempo = song.tempo || 120;
+
+    // Store tempo map (use header-only fallback if empty)
+    this.tempoMap =
+      song.tempoMap && song.tempoMap.length > 0
+        ? [...song.tempoMap]
+        : [{ tick: 0, bpm: this.tempo }];
 
     // Determine if we should use arrangement-based playback
     this.useArrangement = song.arrangement.length > 0;
@@ -330,18 +340,89 @@ export class PlaybackEngine {
     return this.secondsToTicks(elapsed);
   }
 
-  /** Convert ticks to seconds based on current tempo */
+  /** Convert ticks to seconds using the tempo map for accurate timing */
   private ticksToSeconds(ticks: number): number {
     const tpb = this.song?.ticksPerBeat ?? 192;
-    const ticksPerSecond = (this.tempo * tpb) / 60;
-    return ticks / ticksPerSecond;
+
+    // If no tempo map or single tempo, use simple calculation
+    if (this.tempoMap.length <= 1) {
+      const bpm = this.tempoMap[0]?.bpm || this.tempo;
+      const ticksPerSecond = (bpm * tpb) / 60;
+      return ticks / ticksPerSecond;
+    }
+
+    // Piecewise integration across tempo changes
+    let totalSeconds = 0;
+    let remainingTicks = ticks;
+    let currentBpm = this.tempoMap[0].bpm;
+    let currentTick = this.tempoMap[0].tick;
+
+    for (let i = 1; i < this.tempoMap.length && remainingTicks > 0; i++) {
+      const nextChangeTick = this.tempoMap[i].tick;
+      const segmentTicks = Math.min(
+        remainingTicks,
+        nextChangeTick - currentTick,
+      );
+      if (segmentTicks > 0) {
+        const ticksPerSecond = (currentBpm * tpb) / 60;
+        totalSeconds += segmentTicks / ticksPerSecond;
+        remainingTicks -= segmentTicks;
+      }
+      currentBpm = this.tempoMap[i].bpm;
+      currentTick = nextChangeTick;
+    }
+
+    // Remaining ticks at the last tempo
+    if (remainingTicks > 0) {
+      const ticksPerSecond = (currentBpm * tpb) / 60;
+      totalSeconds += remainingTicks / ticksPerSecond;
+    }
+
+    return totalSeconds;
   }
 
-  /** Convert seconds to ticks based on current tempo */
+  /** Convert seconds to ticks using the tempo map for accurate timing */
   private secondsToTicks(seconds: number): number {
     const tpb = this.song?.ticksPerBeat ?? 192;
-    const ticksPerSecond = (this.tempo * tpb) / 60;
-    return Math.floor(seconds * ticksPerSecond);
+
+    // If no tempo map or single tempo, use simple calculation
+    if (this.tempoMap.length <= 1) {
+      const bpm = this.tempoMap[0]?.bpm || this.tempo;
+      const ticksPerSecond = (bpm * tpb) / 60;
+      return Math.floor(seconds * ticksPerSecond);
+    }
+
+    // Piecewise integration across tempo changes
+    let remainingSeconds = seconds;
+    let totalTicks = 0;
+    let currentBpm = this.tempoMap[0].bpm;
+    let currentTick = this.tempoMap[0].tick;
+
+    for (let i = 1; i < this.tempoMap.length && remainingSeconds > 0; i++) {
+      const nextChangeTick = this.tempoMap[i].tick;
+      const segmentTicks = nextChangeTick - currentTick;
+      const ticksPerSecond = (currentBpm * tpb) / 60;
+      const segmentSeconds = segmentTicks / ticksPerSecond;
+
+      if (remainingSeconds <= segmentSeconds) {
+        totalTicks += Math.floor(remainingSeconds * ticksPerSecond);
+        remainingSeconds = 0;
+        break;
+      }
+
+      totalTicks += segmentTicks;
+      remainingSeconds -= segmentSeconds;
+      currentBpm = this.tempoMap[i].bpm;
+      currentTick = nextChangeTick;
+    }
+
+    // Remaining seconds at the last tempo
+    if (remainingSeconds > 0) {
+      const ticksPerSecond = (currentBpm * tpb) / 60;
+      totalTicks += Math.floor(remainingSeconds * ticksPerSecond);
+    }
+
+    return totalTicks;
   }
 
   /** Main scheduler loop */
@@ -438,12 +519,16 @@ export class PlaybackEngine {
     this.currentArrangementIndex = arrangementIndex;
     this.currentPatternIndex = entry.patternIndex;
 
-    // Calculate this entry's duration in ticks based on its bar length
-    const ticksPerMeasure = this.song.ticksPerMeasure || 768;
-    const entryDurationTicks = entry.length * ticksPerMeasure;
+    // Use tick-accurate duration from the arrangement table.
+    // This fixes playback gaps by using the exact tick span recorded
+    // in the original Notator arrangement rather than bar-based math.
+    const entryDurationTicks =
+      entry.lengthTicks && entry.lengthTicks > 0
+        ? entry.lengthTicks
+        : entry.length * (this.song.ticksPerMeasure || 768);
 
     // Use the shorter of: entry duration or actual pattern data length
-    // This ensures we don't play beyond the arrangement entry's bars,
+    // This ensures we don't play beyond the arrangement entry's ticks,
     // but also don't wait forever if the pattern data is shorter
     this.currentEntryTotalTicks = Math.min(
       entryDurationTicks,
