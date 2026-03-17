@@ -900,21 +900,6 @@ function PlayerContent() {
         onExportMidi={handleExportMidi}
       />
 
-      {/* Auth + Publish buttons */}
-      <div className="flex items-center gap-2 border-b border-notator-border bg-notator-surface px-3 py-1">
-        <div className="flex-1" />
-        {song && isAuthenticated && (
-          <button
-            onClick={() => setShowPublish(true)}
-            className="notator-btn rounded border-notator-green/50 px-3 py-1 text-[10px] text-notator-green transition-colors hover:border-notator-green hover:bg-notator-green/10"
-            id="publish-song-btn"
-          >
-            🌍 Share with Community
-          </button>
-        )}
-        <UserMenu onLoginClick={() => setShowLogin(true)} />
-      </div>
-
       {/* Mobile panel tabs — visible only below sm */}
       <div className="flex border-b border-notator-border bg-notator-surface sm:hidden">
         {(
@@ -1086,7 +1071,7 @@ function PlayerContent() {
               {song.patterns.find((p) => p.index === activePatternIndex)
                 ?.name || `P${activePatternIndex + 1}`}
             </span>
-            <span className="ml-auto">
+            <span className="ml-auto flex items-center gap-2">
               <button
                 onClick={() => setShowTimeline((v) => !v)}
                 className={`rounded px-2 py-0.5 text-[9px] font-bold ${
@@ -1098,6 +1083,16 @@ function PlayerContent() {
               >
                 {showTimeline ? "▼ SCORE" : "▶ SCORE"}
               </button>
+              {song && isAuthenticated && (
+                <button
+                  onClick={() => setShowPublish(true)}
+                  className="notator-btn rounded border-notator-green/50 px-2 py-0.5 text-[9px] text-notator-green transition-colors hover:border-notator-green hover:bg-notator-green/10"
+                  id="publish-song-btn"
+                >
+                  🌍 Share
+                </button>
+              )}
+              <UserMenu onLoginClick={() => setShowLogin(true)} />
             </span>
           </div>
 
