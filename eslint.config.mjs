@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendored third-party scripts:
     "public/webaudiofont/**",
+    // Auto-generated wasm-bindgen output:
+    "lib/son-parser-wasm/**",
   ]),
 ]);
 

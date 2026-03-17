@@ -231,10 +231,11 @@ function PlayerContent() {
       },
     });
     engineRef.current = engine;
+    // Capture ref value before cleanup (React hooks lint rule)
+    const timers = activeTrackTimers.current;
     return () => {
       engine.destroy();
       // Clear all active track timers
-      const timers = activeTrackTimers.current;
       for (const timer of timers.values()) {
         clearTimeout(timer);
       }

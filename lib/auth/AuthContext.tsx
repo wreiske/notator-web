@@ -44,15 +44,13 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserPublic | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Only start in loading state if there's actually a token to validate
+  const [isLoading, setIsLoading] = useState(() => !!getToken());
 
   // Check existing session on mount
   useEffect(() => {
     const token = getToken();
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
+    if (!token) return;
 
     getSession()
       .then((data) => {

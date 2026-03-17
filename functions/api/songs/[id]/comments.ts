@@ -6,7 +6,7 @@
  */
 
 import { generateId } from "../../../lib/auth";
-import type { Env, UserRecord, CommentRecord } from "../../../lib/types";
+import type { Env, UserRecord } from "../../../lib/types";
 import { jsonResponse, errorResponse } from "../../../lib/types";
 
 // ─── GET ───

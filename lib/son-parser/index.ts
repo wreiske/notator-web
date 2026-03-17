@@ -927,6 +927,22 @@ function buildSongData(
     );
   }
 
+  // Extract tempo map from notation events (subType 1 = tempo change)
+  const tempoMap: import("./types").TempoChange[] = [];
+  for (const slot of trackSlots) {
+    for (const event of slot.events) {
+      if (event.type === "notation") {
+        if (event.subType === 1 && event.raw.length >= 12) {
+          const bpm = (event.raw[10] << 8) | event.raw[11];
+          if (bpm > 0 && bpm <= 300) {
+            tempoMap.push({ tick: event.tick, bpm });
+          }
+        }
+      }
+    }
+  }
+  tempoMap.sort((a, b) => a.tick - b.tick);
+
   return {
     tracks: activeTracks,
     patterns,
@@ -940,6 +956,7 @@ function buildSongData(
     channelConfig: header.channelConfig,
     headerConfig: header.headerConfig,
     trackGroups: header.trackGroups,
+    tempoMap,
   };
 }
 
@@ -1056,21 +1073,27 @@ function parseArrangement(
         patternIndex: aCol - 1, // Convert to 0-based
         bar,
         length: 1, // Will be recomputed below
+        tickPosition: tickPos - (baseTick >= 0 ? baseTick : 0),
+        lengthTicks: 0, // Will be recomputed below
         name: displayName,
         columns: { a: aCol, b: 0, c: 0, d: 0 },
       });
     }
 
-    // Compute bar lengths from consecutive entry positions
+    // Compute bar lengths and tick lengths from consecutive entry positions
     for (let i = 0; i < entries.length - 1; i++) {
       entries[i].length = entries[i + 1].bar - entries[i].bar;
+      entries[i].lengthTicks =
+        entries[i + 1].tickPosition - entries[i].tickPosition;
     }
     // Last entry gets a default length of 1
     if (entries.length > 0) {
-      entries[entries.length - 1].length = Math.max(
+      const last = entries[entries.length - 1];
+      last.length = Math.max(
         1,
         entries.length > 1 ? entries[entries.length - 2].length : 4,
       );
+      last.lengthTicks = last.length * TICKS_PER_BAR;
     }
   }
 
@@ -1083,10 +1106,13 @@ function parseArrangement(
         1,
         Math.ceil(pat.totalTicks / ticksPerMeasure),
       );
+      const tickPosition = (bar - 1) * ticksPerMeasure;
       entries.push({
         patternIndex: pat.index,
         bar,
         length: barLength,
+        tickPosition,
+        lengthTicks: barLength * ticksPerMeasure,
         name: pat.name,
         columns: { a: pat.index + 1, b: 0, c: 0, d: 0 },
       });
