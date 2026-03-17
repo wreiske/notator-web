@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://notator.online"),
-  title: "Notator Web — Atari ST MIDI Sequencer Community",
+  title: "Notator Online — Atari ST MIDI Sequencer Community",
   description:
     "Play, share, and archive Notator SL .SON files with the Atari ST community. Upload your songs, discover music, and connect with fellow Notator users.",
   keywords: [
@@ -32,16 +32,16 @@ export const metadata: Metadata = {
     "archive",
   ],
   openGraph: {
-    title: "Notator Web — Atari ST MIDI Sequencer Community",
+    title: "Notator Online — Atari ST MIDI Sequencer Community",
     description:
       "Play, share, and archive Notator SL .SON files with the Atari ST community.",
     url: "https://notator.online",
-    siteName: "Notator Web",
+    siteName: "Notator Online",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Notator Web — Atari ST MIDI Sequencer Community",
+    title: "Notator Online — Atari ST MIDI Sequencer Community",
     description:
       "Play, share, and archive Notator SL .SON files with the Atari ST community.",
   },

@@ -77,7 +77,7 @@ export function MobileNav({ onLoginClick, activePage }: MobileNavProps) {
         <Link href="/" className="flex items-center gap-2">
           <span className="text-xl">🎹</span>
           <span className="text-sm font-bold text-notator-text">
-            Notator Web
+            Notator Online
           </span>
         </Link>
 

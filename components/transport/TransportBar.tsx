@@ -75,7 +75,7 @@ export function TransportBar({
         label: "Desk",
         items: [
           {
-            label: "About Notator Web…",
+            label: "About Notator Online…",
             onClick: () => setAboutOpen(true),
           },
         ],
@@ -157,7 +157,7 @@ export function TransportBar({
           },
           { label: "", separator: true },
           {
-            label: "About Notator Web…",
+            label: "About Notator Online…",
             onClick: () => setAboutOpen(true),
           },
         ],

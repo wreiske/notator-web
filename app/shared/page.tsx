@@ -187,7 +187,7 @@ function SharedContent() {
       </div>
 
       <p className="mt-8 text-[10px] text-notator-text-dim">
-        Notator Web — The Atari ST Sequencer Community at{" "}
+        Notator Online — The Atari ST Sequencer Community at{" "}
         <a href="https://notator.online" className="text-notator-accent">
           notator.online
         </a>

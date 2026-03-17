@@ -42,7 +42,7 @@ export default function HomePage() {
               </div>
               <div className="text-left">
                 <h1 className="text-base font-bold tracking-tight text-notator-text sm:text-lg">
-                  Notator Web
+                  Notator Online
                 </h1>
                 <p className="text-[9px] uppercase tracking-widest text-notator-text-dim sm:text-[10px]">
                   Community Edition
@@ -297,7 +297,7 @@ export default function HomePage() {
             </a>
           </div>
           <p>
-            Notator Web — A modern tribute to{" "}
+            Notator Online — A modern tribute to{" "}
             <span className="text-notator-text-muted">Notator SL</span> by
             C-Lab/eMagic for the Atari ST
           </p>

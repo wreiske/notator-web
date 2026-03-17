@@ -262,7 +262,7 @@ function ProfileContent() {
       {/* Footer */}
       <footer className="border-t border-notator-border py-4 text-center text-xs text-notator-text-dim">
         <p>
-          Notator Web — The Atari ST Sequencer Community at{" "}
+          Notator Online — The Atari ST Sequencer Community at{" "}
           <a href="https://notator.online" className="text-notator-accent">
             notator.online
           </a>

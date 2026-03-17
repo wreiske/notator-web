@@ -40,13 +40,13 @@ export function AboutDialog({ open, onClose }: AboutDialogProps) {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="About Notator Web"
+      aria-label="About Notator Online"
     >
       <div className="notator-dialog" onClick={(e) => e.stopPropagation()}>
         {/* Title bar — GEM style */}
         <div className="notator-dialog-titlebar">
           <span className="flex-1 text-center font-bold tracking-wider">
-            About Notator Web
+            About Notator Online
           </span>
           <button
             onClick={onClose}

@@ -1,4 +1,4 @@
-# Notator Web 🎹
+# Notator Online 🎹
 
 > The Atari ST Sequencer, in your browser
 
