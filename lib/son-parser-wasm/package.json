@@ -1,0 +1,17 @@
+{
+  "name": "son-parser",
+  "type": "module",
+  "description": "Notator SL .SON file parser and MIDI exporter",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "son_parser_bg.wasm",
+    "son_parser.js",
+    "son_parser.d.ts"
+  ],
+  "main": "son_parser.js",
+  "types": "son_parser.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
