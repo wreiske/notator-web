@@ -288,7 +288,7 @@ export default function HomePage() {
               Community
             </Link>
             <a
-              href="https://github.com/wreiske/notator"
+              href="https://github.com/wreiske/notator-web"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-notator-accent"

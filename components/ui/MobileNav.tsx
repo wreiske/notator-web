@@ -62,7 +62,7 @@ export function MobileNav({ onLoginClick, activePage }: MobileNavProps) {
         ]
       : []),
     {
-      href: "https://github.com/wreiske/notator",
+      href: "https://github.com/wreiske/notator-web",
       label: "GitHub",
       icon: "⌨",
       page: undefined,
