@@ -1,6 +1,6 @@
 name = "notator"
-# Clarity Bytes, LLC — NEVER deploy to Bellamy Holdings
-account_id = "78722579b5cfd79a9390d7a81b54dd03"
+# Account: Clarity Bytes, LLC (78722579b5cfd79a9390d7a81b54dd03)
+# NEVER use Bellamy Holdings — use CLOUDFLARE_ACCOUNT_ID env var for wrangler CLI
 compatibility_date = "2025-01-01"
 pages_build_output_dir = "out"
 
