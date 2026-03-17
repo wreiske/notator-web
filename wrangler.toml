@@ -1,4 +1,6 @@
 name = "notator"
+# Clarity Bytes, LLC — NEVER deploy to Bellamy Holdings
+account_id = "78722579b5cfd79a9390d7a81b54dd03"
 compatibility_date = "2025-01-01"
 pages_build_output_dir = "out"
 
