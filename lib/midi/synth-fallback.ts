@@ -69,6 +69,13 @@ interface ActiveEnvelope {
   note: number;
 }
 
+interface PendingNote {
+  channel: number;
+  note: number;
+  velocity: number;
+  when: number;
+}
+
 export class SynthFallback {
   private audioContext: AudioContext | null = null;
   private masterGain: GainNode | null = null;
@@ -84,6 +91,8 @@ export class SynthFallback {
   private channelPrograms: number[] = new Array(16).fill(0);
   /** Set of instruments currently being loaded */
   private loading: Set<string> = new Set();
+  /** Notes waiting for their instrument to load */
+  private pendingNotes: Map<string, PendingNote[]> = new Map();
 
   /** Initialize the audio context and WebAudioFont player */
   async init(): Promise<void> {
@@ -125,19 +134,25 @@ export class SynthFallback {
     this.loadInstrument(program & 0x7f);
   }
 
-  /** Start a note with SoundFont samples */
-  noteOn(channel: number, note: number, velocity: number): void {
+  /** Start a note with SoundFont samples.
+   *  @param when  Optional AudioContext time to schedule the note at.
+   *               Defaults to audioContext.currentTime (immediate). */
+  noteOn(channel: number, note: number, velocity: number, when?: number): void {
     if (!this.audioContext || !this.masterGain || !this.player) return;
 
     const key = channel * 128 + note;
-    this.noteOff(channel, note); // Stop any existing note
+    this.noteOff(channel, note, when); // Stop any existing note
 
     const volume = (velocity / 127) * 0.8;
+    const scheduledTime = when ?? this.audioContext.currentTime;
 
     if (channel === 9) {
       // Drum channel — use drum preset
       const preset = this.drums.get(note);
       if (!preset) {
+        // Queue the note and start loading
+        const drumKey = getDrumKey(note).variable;
+        this.queuePendingNote(drumKey, { channel, note, velocity, when: scheduledTime });
         this.loadDrum(note);
         return;
       }
@@ -146,7 +161,7 @@ export class SynthFallback {
         this.audioContext,
         this.masterGain,
         preset,
-        this.audioContext.currentTime,
+        scheduledTime,
         note,
         1.5, // Duration for drums (they're percussive, will decay)
         volume,
@@ -159,6 +174,9 @@ export class SynthFallback {
       const preset = this.instruments.get(program);
 
       if (!preset) {
+        // Queue the note and start loading
+        const instrKey = getInstrumentKey(program).variable;
+        this.queuePendingNote(instrKey, { channel, note, velocity, when: scheduledTime });
         this.loadInstrument(program);
         return;
       }
@@ -167,7 +185,7 @@ export class SynthFallback {
         this.audioContext,
         this.masterGain,
         preset,
-        this.audioContext.currentTime,
+        scheduledTime,
         note,
         10, // Long duration — noteOff will cut it short
         volume,
@@ -177,8 +195,9 @@ export class SynthFallback {
     }
   }
 
-  /** Stop a note */
-  noteOff(channel: number, note: number): void {
+  /** Stop a note.
+   *  @param when  Optional AudioContext time to schedule the stop at. */
+  noteOff(channel: number, note: number, when?: number): void {
     if (!this.audioContext) return;
 
     const key = channel * 128 + note;
@@ -186,11 +205,10 @@ export class SynthFallback {
     if (!active || !active.envelope) return;
 
     // Cancel the envelope with a quick fade
+    const stopTime = (when ?? this.audioContext.currentTime) + 0.05;
     try {
       if (active.envelope.audioBufferSourceNode) {
-        active.envelope.audioBufferSourceNode.stop(
-          this.audioContext.currentTime + 0.05,
-        );
+        active.envelope.audioBufferSourceNode.stop(stopTime);
       }
     } catch {
       // Already stopped
@@ -228,6 +246,20 @@ export class SynthFallback {
     }
   }
 
+  /** Preload all instruments that a song uses (by GM program numbers).
+   *  Call this before playback starts to avoid dropped first notes. */
+  async preloadForSong(programs: number[]): Promise<void> {
+    const promises: Promise<void>[] = [];
+    for (const program of programs) {
+      if (!this.instruments.has(program)) {
+        promises.push(this.loadInstrument(program));
+      }
+    }
+    if (promises.length > 0) {
+      await Promise.all(promises);
+    }
+  }
+
   /** Clean up resources */
   destroy(): void {
     this.panic();
@@ -237,6 +269,7 @@ export class SynthFallback {
     }
     this.instruments.clear();
     this.drums.clear();
+    this.pendingNotes.clear();
   }
 
   // ─── Internal Loading ───────────────────────────────────────────────
@@ -258,6 +291,7 @@ export class SynthFallback {
         }
         this.instruments.set(program, preset);
         console.log(`[GM] Loaded program ${program} (cached): ${variable}`);
+        this.replayPendingNotes(variable);
         return;
       }
 
@@ -269,6 +303,7 @@ export class SynthFallback {
         this.player.adjustPreset(this.audioContext, preset);
         this.instruments.set(program, preset);
         console.log(`[GM] Loaded program ${program}: ${variable}`);
+        this.replayPendingNotes(variable);
       }
     } catch (err) {
       console.warn(`[GM] Failed to load program ${program}:`, err);
@@ -292,6 +327,7 @@ export class SynthFallback {
           this.player.adjustPreset(this.audioContext, preset);
         }
         this.drums.set(noteNumber, preset);
+        this.replayPendingNotes(variable);
         return;
       }
 
@@ -301,6 +337,7 @@ export class SynthFallback {
       if (preset && this.audioContext && this.player) {
         this.player.adjustPreset(this.audioContext, preset);
         this.drums.set(noteNumber, preset);
+        this.replayPendingNotes(variable);
       }
     } catch (err) {
       console.warn(`[GM] Failed to load drum ${noteNumber}:`, err);
@@ -321,6 +358,35 @@ export class SynthFallback {
     }
   }
 
+  // ─── Pending Note Queue ──────────────────────────────────────────────
+
+  /** Queue a note to be played once its instrument/drum loads */
+  private queuePendingNote(variableKey: string, pending: PendingNote): void {
+    const list = this.pendingNotes.get(variableKey) || [];
+    list.push(pending);
+    this.pendingNotes.set(variableKey, list);
+  }
+
+  /** Replay any pending notes for a just-loaded instrument/drum */
+  private replayPendingNotes(variableKey: string): void {
+    const pending = this.pendingNotes.get(variableKey);
+    if (!pending || pending.length === 0) return;
+    this.pendingNotes.delete(variableKey);
+
+    if (!this.audioContext) return;
+
+    // Only replay notes that are still in the near future (within 500ms).
+    // Notes that are already far in the past aren't worth replaying.
+    const now = this.audioContext.currentTime;
+    for (const p of pending) {
+      if (p.when >= now - 0.1) {
+        // Schedule at 'now' if the original time has passed
+        const when = Math.max(now, p.when);
+        this.noteOn(p.channel, p.note, p.velocity, when);
+      }
+    }
+  }
+
   /** Load a JavaScript file from URL */
   private loadScript(url: string): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -331,5 +397,10 @@ export class SynthFallback {
       script.onerror = () => reject(new Error(`Failed to load font: ${url}`));
       document.head.appendChild(script);
     });
+  }
+
+  /** Get the AudioContext (for computing scheduled times externally) */
+  getAudioContext(): AudioContext | null {
+    return this.audioContext;
   }
 }

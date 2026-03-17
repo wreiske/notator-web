@@ -131,6 +131,9 @@ export class PlaybackEngine {
       this.currentEntryTotalTicks = song.totalTicks;
       this.resetTrackState();
     }
+
+    // Preload all instruments referenced in the song's tracks
+    this.preloadSongInstruments();
   }
 
   /** Set playback tempo */
@@ -461,6 +464,11 @@ export class PlaybackEngine {
       return;
     }
 
+    // Get the audio context time reference for pre-scheduling
+    const audioCtx = this.synth.getAudioContext();
+    const audioNow = audioCtx?.currentTime ?? 0;
+    const engineNow = performance.now() / 1000;
+
     for (let i = 0; i < this.scheduledTracks.length; i++) {
       const track = this.scheduledTracks[i];
 
@@ -472,7 +480,13 @@ export class PlaybackEngine {
         if (event.tick >= this.currentEntryTotalTicks) break;
 
         if (this.isTrackAudible(i)) {
-          this.dispatchEvent(track.channel, event);
+          // Calculate precise when time: how far in the future is this event?
+          const eventSecs = this.ticksToSeconds(event.tick);
+          const elapsedSecs = engineNow - this.startTime;
+          const deltaFromNow = eventSecs - elapsedSecs;
+          const whenSecs = audioNow + Math.max(0, deltaFromNow);
+
+          this.dispatchEvent(track.channel, event, whenSecs);
           this.callbacks.onTrackEvent?.(i, event);
         }
 
@@ -626,18 +640,23 @@ export class PlaybackEngine {
     }
   }
 
-  /** Dispatch a single event to the output */
-  private dispatchEvent(channel: number, event: TrackEvent): void {
+  /** Dispatch a single event to the output at a precise scheduled time */
+  private dispatchEvent(channel: number, event: TrackEvent, whenSecs?: number): void {
     if (this.midiOutput) {
+      // For Web MIDI: convert audioContext time to DOMHighResTimestamp
+      const timestamp = whenSecs !== undefined
+        ? performance.now() + ((whenSecs - (this.synth.getAudioContext()?.currentTime ?? 0)) * 1000)
+        : undefined;
+
       switch (event.type) {
         case "note_on":
-          midiNoteOn(this.midiOutput, channel, event.note, event.velocity);
+          midiNoteOn(this.midiOutput, channel, event.note, event.velocity, timestamp);
           break;
         case "note_off":
-          midiNoteOff(this.midiOutput, channel, event.note);
+          midiNoteOff(this.midiOutput, channel, event.note, timestamp);
           break;
         case "pitch_wheel":
-          midiPitchWheel(this.midiOutput, channel, event.value);
+          midiPitchWheel(this.midiOutput, channel, event.value, timestamp);
           break;
         case "program_change":
           // Send MIDI program change to hardware
@@ -645,17 +664,17 @@ export class PlaybackEngine {
             this.midiOutput.send([
               0xc0 | (channel & 0x0f),
               event.program & 0x7f,
-            ]);
+            ], timestamp);
           }
           break;
       }
     } else {
       switch (event.type) {
         case "note_on":
-          this.synth.noteOn(channel, event.note, event.velocity);
+          this.synth.noteOn(channel, event.note, event.velocity, whenSecs);
           break;
         case "note_off":
-          this.synth.noteOff(channel, event.note);
+          this.synth.noteOff(channel, event.note, whenSecs);
           break;
         case "program_change":
           this.synth.programChange(channel, event.program);
@@ -719,5 +738,38 @@ export class PlaybackEngine {
   destroy(): void {
     this.stop();
     this.synth.destroy();
+  }
+
+  /** Scan all patterns for program_change events and preload those instruments */
+  private preloadSongInstruments(): void {
+    if (!this.song) return;
+
+    const programs = new Set<number>();
+    // Always include piano (program 0) as default
+    programs.add(0);
+
+    for (const pattern of this.song.patterns) {
+      for (const track of pattern.tracks) {
+        for (const event of track.events) {
+          if (event.type === "program_change") {
+            programs.add(event.program & 0x7f);
+          }
+        }
+      }
+    }
+
+    // Also check top-level tracks
+    for (const track of this.song.tracks) {
+      for (const event of track.events) {
+        if (event.type === "program_change") {
+          programs.add(event.program & 0x7f);
+        }
+      }
+    }
+
+    if (programs.size > 0) {
+      console.log(`[Engine] Preloading ${programs.size} instruments:`, [...programs]);
+      this.synth.preloadForSong([...programs]);
+    }
   }
 }
