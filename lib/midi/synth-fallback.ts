@@ -89,6 +89,8 @@ export class SynthFallback {
   private activeNotes: Map<number, ActiveEnvelope> = new Map();
   /** Per-channel program assignment (default: 0 = Acoustic Grand Piano) */
   private channelPrograms: number[] = new Array(16).fill(0);
+  /** Channels routed to drum patches (default: channel 9 / GM ch 10) */
+  private drumChannels: Set<number> = new Set([9]);
   /** Set of instruments currently being loaded */
   private loading: Set<string> = new Set();
   /** Notes waiting for their instrument to load */
@@ -129,9 +131,19 @@ export class SynthFallback {
 
   /** Set program (instrument) for a channel */
   programChange(channel: number, program: number): void {
-    if (channel === 9) return; // Drums don't have program changes in GM
+    if (this.drumChannels.has(channel)) return; // Drums don't have program changes in GM
     this.channelPrograms[channel] = program & 0x7f;
     this.loadInstrument(program & 0x7f);
+  }
+
+  /** Configure which channels are routed to drum patches */
+  setDrumChannels(channels: Set<number>): void {
+    this.drumChannels = new Set(channels);
+  }
+
+  /** Get the current drum channel set */
+  getDrumChannels(): Set<number> {
+    return new Set(this.drumChannels);
   }
 
   /** Start a note with SoundFont samples.
@@ -146,13 +158,18 @@ export class SynthFallback {
     const volume = (velocity / 127) * 0.8;
     const scheduledTime = when ?? this.audioContext.currentTime;
 
-    if (channel === 9) {
+    if (this.drumChannels.has(channel)) {
       // Drum channel — use drum preset
       const preset = this.drums.get(note);
       if (!preset) {
         // Queue the note and start loading
         const drumKey = getDrumKey(note).variable;
-        this.queuePendingNote(drumKey, { channel, note, velocity, when: scheduledTime });
+        this.queuePendingNote(drumKey, {
+          channel,
+          note,
+          velocity,
+          when: scheduledTime,
+        });
         this.loadDrum(note);
         return;
       }
@@ -176,7 +193,12 @@ export class SynthFallback {
       if (!preset) {
         // Queue the note and start loading
         const instrKey = getInstrumentKey(program).variable;
-        this.queuePendingNote(instrKey, { channel, note, velocity, when: scheduledTime });
+        this.queuePendingNote(instrKey, {
+          channel,
+          note,
+          velocity,
+          when: scheduledTime,
+        });
         this.loadInstrument(program);
         return;
       }

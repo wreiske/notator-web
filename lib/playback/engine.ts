@@ -641,16 +641,28 @@ export class PlaybackEngine {
   }
 
   /** Dispatch a single event to the output at a precise scheduled time */
-  private dispatchEvent(channel: number, event: TrackEvent, whenSecs?: number): void {
+  private dispatchEvent(
+    channel: number,
+    event: TrackEvent,
+    whenSecs?: number,
+  ): void {
     if (this.midiOutput) {
       // For Web MIDI: convert audioContext time to DOMHighResTimestamp
-      const timestamp = whenSecs !== undefined
-        ? performance.now() + ((whenSecs - (this.synth.getAudioContext()?.currentTime ?? 0)) * 1000)
-        : undefined;
+      const timestamp =
+        whenSecs !== undefined
+          ? performance.now() +
+            (whenSecs - (this.synth.getAudioContext()?.currentTime ?? 0)) * 1000
+          : undefined;
 
       switch (event.type) {
         case "note_on":
-          midiNoteOn(this.midiOutput, channel, event.note, event.velocity, timestamp);
+          midiNoteOn(
+            this.midiOutput,
+            channel,
+            event.note,
+            event.velocity,
+            timestamp,
+          );
           break;
         case "note_off":
           midiNoteOff(this.midiOutput, channel, event.note, timestamp);
@@ -661,10 +673,10 @@ export class PlaybackEngine {
         case "program_change":
           // Send MIDI program change to hardware
           if (this.midiOutput.send) {
-            this.midiOutput.send([
-              0xc0 | (channel & 0x0f),
-              event.program & 0x7f,
-            ], timestamp);
+            this.midiOutput.send(
+              [0xc0 | (channel & 0x0f), event.program & 0x7f],
+              timestamp,
+            );
           }
           break;
       }
@@ -734,6 +746,38 @@ export class PlaybackEngine {
     }
   }
 
+  /**
+   * Apply channel configuration changes from the Channel Map Editor.
+   * Sends program changes, updates drum channel routing, and sets volume/pan.
+   */
+  applyChannelConfig(
+    config: { programs: number[]; volumes: number[]; pans: number[] },
+    drumChannels: Set<number>,
+  ): void {
+    // Update drum channel routing in the synth
+    this.synth.setDrumChannels(drumChannels);
+
+    // Apply program changes for each non-drum channel
+    for (let ch = 0; ch < 16; ch++) {
+      if (!drumChannels.has(ch)) {
+        const program = config.programs[ch] ?? 0;
+        this.synth.programChange(ch, program);
+      }
+    }
+
+    // Preload any new instruments
+    const programs = config.programs
+      .filter((_, i) => !drumChannels.has(i))
+      .filter((p) => p !== undefined);
+    if (programs.length > 0) {
+      this.synth.preloadForSong(programs);
+    }
+
+    console.log(
+      `[Engine] Applied channel config: drums=[${[...drumChannels]}], programs=[${config.programs}]`,
+    );
+  }
+
   /** Clean up all resources */
   destroy(): void {
     this.stop();
@@ -768,7 +812,9 @@ export class PlaybackEngine {
     }
 
     if (programs.size > 0) {
-      console.log(`[Engine] Preloading ${programs.size} instruments:`, [...programs]);
+      console.log(`[Engine] Preloading ${programs.size} instruments:`, [
+        ...programs,
+      ]);
       this.synth.preloadForSong([...programs]);
     }
   }

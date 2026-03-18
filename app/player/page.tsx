@@ -34,6 +34,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { LoginModal } from "@/components/auth/LoginModal";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { PublishModal } from "@/components/songs/PublishModal";
+import { ChannelMapEditor } from "@/components/tracks/ChannelMapEditor";
 import { downloadUserFile } from "@/lib/auth/api";
 
 /** Demo .SON files bundled from the /st directory */
@@ -82,6 +83,8 @@ function PlayerContent() {
   // Auth / Community UI state
   const [showLogin, setShowLogin] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
+  const [showChannelMap, setShowChannelMap] = useState(false);
+  const [drumChannels, setDrumChannels] = useState<Set<number>>(new Set([9]));
 
   // Playback state
   const [playbackState, setPlaybackState] = useState<PlaybackState>("stopped");
@@ -1152,6 +1155,13 @@ function PlayerContent() {
                   🌍 Share
                 </button>
               )}
+              <button
+                onClick={() => setShowChannelMap(true)}
+                className="notator-btn rounded border-notator-accent/50 px-2 py-0.5 text-[9px] text-notator-accent transition-colors hover:border-notator-accent hover:bg-notator-accent/10"
+                id="channel-map-btn"
+              >
+                🎹 MIDI Map
+              </button>
               <UserMenu onLoginClick={() => setShowLogin(true)} />
             </span>
           </div>
@@ -1192,12 +1202,37 @@ function PlayerContent() {
             {selectedTrack ? (
               <div className="space-y-0 text-[11px]">
                 {/* Track properties — styled like the original's right panel */}
+                {[{ label: "NAME", value: selectedTrack.name || "---" }].map(
+                  ({ label, value }) => (
+                    <div
+                      key={label}
+                      className="flex items-center justify-between border-b border-notator-border/30 px-3 py-1.5"
+                    >
+                      <span className="text-notator-text-dim">{label}</span>
+                      <span className="font-bold tabular-nums text-notator-text">
+                        {value}
+                      </span>
+                    </div>
+                  ),
+                )}
+
+                {/* CHANNEL — clickable to open MIDI Map */}
+                <div
+                  className="flex cursor-pointer items-center justify-between border-b border-notator-border/30 px-3 py-1.5 transition-colors hover:bg-notator-surface-hover"
+                  onClick={() => setShowChannelMap(true)}
+                  title="Click to open MIDI Channel Map"
+                  id="track-info-channel-link"
+                >
+                  <span className="text-notator-text-dim">CHANNEL</span>
+                  <span className="font-bold tabular-nums text-notator-accent hover:underline">
+                    {`${String.fromCharCode(65 + Math.floor(selectedTrack.channel / 16))} ${(selectedTrack.channel % 16) + 1}`}
+                    <span className="ml-1 text-[9px] text-notator-text-dim">
+                      ✎
+                    </span>
+                  </span>
+                </div>
+
                 {[
-                  { label: "NAME", value: selectedTrack.name || "---" },
-                  {
-                    label: "CHANNEL",
-                    value: `${String.fromCharCode(65 + Math.floor(selectedTrack.channel / 16))} ${(selectedTrack.channel % 16) + 1}`,
-                  },
                   { label: "QUANTIZE", value: String(song.ticksPerMeasure) },
                   { label: "NOTES", value: String(noteOns.length) },
                   {
@@ -1344,10 +1379,16 @@ function PlayerContent() {
                   </div>
                 </div>
 
-                {/* Channel config overview */}
-                <div className="border-t border-notator-border px-3 py-1.5">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-notator-text-dim">
+                {/* Channel config overview — clickable to open MIDI Map */}
+                <div
+                  className="cursor-pointer border-t border-notator-border px-3 py-1.5 transition-colors hover:bg-notator-surface-hover"
+                  onClick={() => setShowChannelMap(true)}
+                  title="Click to edit MIDI Channel Map"
+                  id="channel-config-header-link"
+                >
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-notator-accent">
                     Channel {(selectedTrack.channel % 16) + 1}
+                    <span className="ml-1 text-notator-text-dim">✎</span>
                   </span>
                 </div>
                 {[
@@ -1586,6 +1627,31 @@ function PlayerContent() {
         songBuffer={songBuffer}
         songFileName={songFileName}
       />
+
+      {/* Channel Map Editor */}
+      {showChannelMap && song && (
+        <ChannelMapEditor
+          channelConfig={song.channelConfig}
+          instrumentNames={song.instrumentNames}
+          drumChannels={drumChannels}
+          onApply={(config, newDrumChannels) => {
+            // Update song state with new channel config
+            setSong((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    channelConfig: config,
+                  }
+                : prev,
+            );
+            setDrumChannels(newDrumChannels);
+            // Apply to the playback engine
+            engineRef.current?.applyChannelConfig(config, newDrumChannels);
+            setShowChannelMap(false);
+          }}
+          onClose={() => setShowChannelMap(false)}
+        />
+      )}
     </div>
   );
 }

@@ -253,8 +253,12 @@ body {
 
 /* Animations */
 @keyframes notator-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes notator-scale-in {
@@ -402,5 +406,482 @@ body {
   color: white !important;
   border-color: var(--color-notator-accent) !important;
 }
+/* ═══ Channel Map Editor ═══ */
 
+.notator-channel-map-dialog {
+  position: relative;
+  width: 760px;
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-notator-panel);
+  border: 2px solid var(--color-notator-border-bright);
+  box-shadow:
+    4px 4px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px var(--color-notator-border);
+  font-family: var(--font-mono);
+  animation: notator-scale-in 0.15s ease;
+}
 
+/* Scrollable body */
+.channel-map-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Table */
+.channel-map-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  table-layout: fixed;
+}
+
+/* Header row */
+.channel-map-thead-row {
+  background: var(--color-notator-surface);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.channel-map-th {
+  padding: 6px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-notator-text-dim);
+  text-align: left;
+  border-bottom: 1px solid var(--color-notator-border-bright);
+  white-space: nowrap;
+}
+
+/* Fixed column widths */
+.channel-map-th-ch {
+  width: 40px;
+  text-align: center;
+}
+.channel-map-th-name {
+  width: 80px;
+}
+.channel-map-th-inst {
+  width: auto;
+}
+.channel-map-th-drum {
+  width: 50px;
+  text-align: center;
+}
+.channel-map-th-vol {
+  width: 110px;
+}
+.channel-map-th-pan {
+  width: 110px;
+}
+
+/* Body rows */
+.channel-map-tr {
+  border-bottom: 1px solid var(--color-notator-border);
+  transition: background 0.1s;
+}
+
+.channel-map-tr:hover {
+  background: var(--color-notator-surface-hover);
+}
+
+.channel-map-tr-drum {
+  background: rgba(255, 187, 68, 0.05);
+}
+
+.channel-map-tr-drum:hover {
+  background: rgba(255, 187, 68, 0.1);
+}
+
+/* Body cells */
+.channel-map-td {
+  padding: 4px 8px;
+  vertical-align: middle;
+}
+
+.channel-map-td-ch {
+  text-align: center;
+}
+
+.channel-map-td-name {
+  font-size: 10px;
+  color: var(--color-notator-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80px;
+}
+
+.channel-map-td-inst {
+  padding: 3px 6px;
+}
+
+.channel-map-td-drum {
+  text-align: center;
+}
+
+.channel-map-td-slider {
+  padding: 4px 6px;
+}
+
+/* Channel number badge */
+.channel-map-ch-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--color-notator-surface-active);
+  color: var(--color-notator-text);
+}
+
+/* Instrument program dropdown */
+.channel-map-select {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 8px;
+  background: var(--color-notator-bg);
+  color: var(--color-notator-text);
+  border: 1px solid var(--color-notator-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.channel-map-select:focus {
+  outline: none;
+  border-color: var(--color-notator-accent);
+  box-shadow: 0 0 0 1px var(--color-notator-accent);
+}
+
+.channel-map-select option {
+  background: var(--color-notator-panel);
+  color: var(--color-notator-text);
+}
+
+/* Drum kit label (shown instead of select when drum mode) */
+.channel-map-drum-label {
+  font-size: 10px;
+  color: var(--color-notator-amber);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Drum toggle button */
+.channel-map-drum-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  font-size: 13px;
+  background: var(--color-notator-bg);
+  border: 1px solid var(--color-notator-border);
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: all 0.15s;
+}
+
+.channel-map-drum-btn:hover {
+  opacity: 0.7;
+  border-color: var(--color-notator-amber);
+}
+
+.channel-map-drum-active {
+  opacity: 1 !important;
+  background: var(--color-notator-amber) !important;
+  border-color: var(--color-notator-amber) !important;
+}
+
+/* Slider wrapper (keeps slider + value label in line) */
+.channel-map-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Range slider */
+.channel-map-slider {
+  flex: 1;
+  min-width: 0;
+  max-width: 64px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-notator-border);
+  border-radius: 2px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.channel-map-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 14px;
+  background: var(--color-notator-accent);
+  border-radius: 2px;
+  cursor: pointer;
+  border: none;
+}
+
+.channel-map-slider::-moz-range-thumb {
+  width: 10px;
+  height: 14px;
+  background: var(--color-notator-accent);
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.channel-map-slider-val {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-notator-text-muted);
+  min-width: 26px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* Footer */
+.channel-map-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-notator-border-bright);
+  background: var(--color-notator-surface);
+  gap: 8px;
+}
+
+.channel-map-footer-right {
+  display: flex;
+  gap: 8px;
+}
+
+.channel-map-btn-secondary {
+  font-size: 10px;
+  padding: 5px 14px;
+  border-color: var(--color-notator-border);
+  color: var(--color-notator-text-dim);
+  background: var(--color-notator-bg);
+  border-radius: 3px;
+}
+
+.channel-map-btn-secondary:hover {
+  color: var(--color-notator-text);
+  border-color: var(--color-notator-text-dim);
+  background: var(--color-notator-surface-hover);
+}
+
+.channel-map-btn-primary {
+  font-size: 10px;
+  padding: 5px 18px;
+  border-color: var(--color-notator-accent);
+  color: white;
+  background: var(--color-notator-accent);
+  border-radius: 3px;
+}
+
+.channel-map-btn-primary:hover {
+  background: var(--color-notator-accent-hover);
+  border-color: var(--color-notator-accent-hover);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .channel-map-th-name,
+  .channel-map-td-name {
+    display: none;
+  }
+  .channel-map-slider {
+    max-width: 40px;
+  }
+}
+
+/* ═══ Searchable Select ═══ */
+
+.searchable-select {
+  position: relative;
+  width: 100%;
+}
+
+/* Trigger button (closed state) */
+.searchable-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 8px;
+  background: var(--color-notator-bg);
+  color: var(--color-notator-text);
+  border: 1px solid var(--color-notator-border);
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: left;
+  gap: 4px;
+  transition: border-color 0.15s;
+}
+
+.searchable-select-trigger:hover {
+  border-color: var(--color-notator-accent);
+}
+
+.searchable-select-trigger:focus {
+  outline: none;
+  border-color: var(--color-notator-accent);
+  box-shadow: 0 0 0 1px var(--color-notator-accent);
+}
+
+.searchable-select-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.searchable-select-trigger-arrow {
+  font-size: 9px;
+  color: var(--color-notator-text-dim);
+  flex-shrink: 0;
+}
+
+/* Search input (open state) */
+.searchable-select-input-wrap {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-notator-bg);
+  border: 1px solid var(--color-notator-accent);
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 0 0 1px var(--color-notator-accent);
+}
+
+.searchable-select-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--color-notator-text);
+  border: none;
+  outline: none;
+}
+
+.searchable-select-input::placeholder {
+  color: var(--color-notator-text-dim);
+}
+
+.searchable-select-count {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--color-notator-text-dim);
+  padding-right: 6px;
+  flex-shrink: 0;
+}
+
+/* Dropdown panel */
+.searchable-select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: -1px;
+  right: -1px;
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--color-notator-panel);
+  border: 1px solid var(--color-notator-accent);
+  border-top: none;
+  border-radius: 0 0 3px 3px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--color-notator-accent);
+}
+
+/* Group header */
+.searchable-select-group {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-notator-text-dim);
+  padding: 6px 8px 2px;
+  background: var(--color-notator-surface);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Option row */
+.searchable-select-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.05s;
+  color: var(--color-notator-text);
+}
+
+.searchable-select-option:hover,
+.searchable-select-option-hl {
+  background: var(--color-notator-surface-hover);
+}
+
+.searchable-select-option-sel {
+  color: var(--color-notator-accent);
+  font-weight: 700;
+}
+
+.searchable-select-option-id {
+  font-size: 9px;
+  color: var(--color-notator-text-dim);
+  min-width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.searchable-select-option-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchable-select-option-check {
+  font-size: 10px;
+  color: var(--color-notator-accent);
+  flex-shrink: 0;
+}
+
+/* Empty state */
+.searchable-select-empty {
+  padding: 12px 8px;
+  font-size: 10px;
+  color: var(--color-notator-text-dim);
+  text-align: center;
+  font-style: italic;
+}
