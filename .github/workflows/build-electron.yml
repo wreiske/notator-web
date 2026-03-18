@@ -43,6 +43,8 @@ jobs:
         run: ${{ matrix.build-cmd }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Prevent electron-builder from attempting to publish
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload macOS artifacts
         if: matrix.platform == 'mac'

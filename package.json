@@ -2,7 +2,10 @@
   "name": "notator",
   "version": "0.1.0",
   "description": "Notator Online — Play, share, and archive Atari ST Notator SL .SON files",
-  "author": "Notator Online",
+  "author": {
+    "name": "Notator Online",
+    "email": "notator@notator.online"
+  },
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -11,10 +14,10 @@
     "start": "next start",
     "lint": "eslint",
     "electron:dev": "next build && electron .",
-    "electron:build": "next build && electron-builder --mac --win --linux",
-    "electron:build:mac": "next build && electron-builder --mac",
-    "electron:build:win": "next build && electron-builder --win",
-    "electron:build:linux": "next build && electron-builder --linux"
+    "electron:build": "next build && electron-builder --mac --win --linux --publish never",
+    "electron:build:mac": "next build && electron-builder --mac --publish never",
+    "electron:build:win": "next build && electron-builder --win --publish never",
+    "electron:build:linux": "next build && electron-builder --linux --publish never"
   },
   "dependencies": {
     "next": "16.1.6",
