@@ -206,7 +206,7 @@ export function TransportBar({
   );
 
   return (
-    <div className="select-none border-b-2 border-notator-border-bright bg-notator-panel font-mono text-notator-text">
+    <div className="sticky top-0 z-40 select-none border-b-2 border-notator-border-bright bg-notator-panel font-mono text-notator-text">
       {/* About dialog */}
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
 

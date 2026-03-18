@@ -20,6 +20,8 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 function createWindow() {
+  const isMac = process.platform === "darwin";
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -27,6 +29,16 @@ function createWindow() {
     minHeight: 600,
     title: "Notator",
     backgroundColor: "#0a0a0f",
+    // Frameless window: macOS uses hiddenInset for native traffic lights,
+    // Windows/Linux uses frame: false for fully custom title bar
+    ...(isMac
+      ? {
+          titleBarStyle: "hiddenInset",
+          trafficLightPosition: { x: 12, y: 10 },
+        }
+      : {
+          frame: false,
+        }),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -127,6 +139,23 @@ ipcMain.handle("open-file-dialog", async () => {
 // Get app version
 ipcMain.handle("get-app-version", () => {
   return app.getVersion();
+});
+
+// Window control handlers (for custom title bar)
+ipcMain.handle("window-minimize", () => {
+  mainWindow?.minimize();
+});
+
+ipcMain.handle("window-maximize", () => {
+  if (mainWindow?.isMaximized()) {
+    mainWindow.unmaximize();
+  } else {
+    mainWindow?.maximize();
+  }
+});
+
+ipcMain.handle("window-close", () => {
+  mainWindow?.close();
 });
 
 // Quit when all windows are closed (except macOS)
