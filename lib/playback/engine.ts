@@ -22,6 +22,11 @@ import {
   noteOff as midiNoteOff,
   pitchWheel as midiPitchWheel,
   panic as midiPanic,
+  controlChange as midiControlChange,
+  programChange as midiProgramChange,
+  aftertouch as midiAftertouch,
+  channelPressure as midiChannelPressure,
+  sendSysEx as midiSendSysEx,
 } from "@/lib/midi/web-midi";
 
 export type PlaybackState = "stopped" | "playing" | "paused";
@@ -671,13 +676,36 @@ export class PlaybackEngine {
           midiPitchWheel(this.midiOutput, channel, event.value, timestamp);
           break;
         case "program_change":
-          // Send MIDI program change to hardware
-          if (this.midiOutput.send) {
-            this.midiOutput.send(
-              [0xc0 | (channel & 0x0f), event.program & 0x7f],
-              timestamp,
-            );
-          }
+          midiProgramChange(this.midiOutput, channel, event.program, timestamp);
+          break;
+        case "control_change":
+          midiControlChange(
+            this.midiOutput,
+            channel,
+            event.controller,
+            event.value,
+            timestamp,
+          );
+          break;
+        case "aftertouch":
+          midiAftertouch(
+            this.midiOutput,
+            channel,
+            event.note,
+            event.pressure,
+            timestamp,
+          );
+          break;
+        case "channel_pressure":
+          midiChannelPressure(
+            this.midiOutput,
+            channel,
+            event.pressure,
+            timestamp,
+          );
+          break;
+        case "sysex":
+          midiSendSysEx(this.midiOutput, event.data, timestamp);
           break;
       }
     } else {

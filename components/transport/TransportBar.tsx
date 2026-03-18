@@ -25,6 +25,12 @@ interface TransportBarProps {
   onDemoLoad?: (path: string, name: string) => void;
   /** Export current song as Standard MIDI File */
   onExportMidi?: () => void;
+  /** MIDI state */
+  midiThruEnabled?: boolean;
+  midiOutputName?: string | null;
+  onToggleMidiThru?: () => void;
+  onMidiPanic?: () => void;
+  onOpenMidiSettings?: () => void;
 }
 
 /** Demo .SON files for the File menu */
@@ -62,6 +68,11 @@ export function TransportBar({
   onLoadFileClick,
   onDemoLoad,
   onExportMidi,
+  midiThruEnabled,
+  midiOutputName,
+  onToggleMidiThru,
+  onMidiPanic,
+  onOpenMidiSettings,
 }: TransportBarProps) {
   const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -121,10 +132,21 @@ export function TransportBar({
         label: "MIDI",
         className: "!text-notator-text-muted font-bold",
         items: [
-          { label: "MIDI Thru", disabled: true },
+          {
+            label: midiThruEnabled ? "✓ MIDI Thru" : "MIDI Thru",
+            onClick: onToggleMidiThru,
+          },
           { label: "MIDI Sync", disabled: true },
           { label: "", separator: true },
-          { label: "All Notes Off", disabled: true },
+          {
+            label: "All Notes Off",
+            onClick: onMidiPanic,
+          },
+          { label: "", separator: true },
+          {
+            label: "MIDI Settings…",
+            onClick: onOpenMidiSettings,
+          },
         ],
       },
       {
@@ -140,8 +162,14 @@ export function TransportBar({
       {
         label: "Options",
         items: [
-          { label: "GM Synth", disabled: true },
-          { label: "Web MIDI Output", disabled: true },
+          {
+            label: !midiOutputName ? "✓ GM Synth" : "GM Synth",
+            onClick: onOpenMidiSettings,
+          },
+          {
+            label: midiOutputName ? `✓ ${midiOutputName}` : "Web MIDI Output…",
+            onClick: onOpenMidiSettings,
+          },
         ],
       },
       {
@@ -163,7 +191,18 @@ export function TransportBar({
         ],
       },
     ],
-    [onLoadFileClick, onDemoLoad, onExportMidi, loopEnabled, onToggleLoop],
+    [
+      onLoadFileClick,
+      onDemoLoad,
+      onExportMidi,
+      loopEnabled,
+      onToggleLoop,
+      midiThruEnabled,
+      midiOutputName,
+      onToggleMidiThru,
+      onMidiPanic,
+      onOpenMidiSettings,
+    ],
   );
 
   return (
@@ -260,9 +299,26 @@ export function TransportBar({
       <div className="flex items-center justify-between border-t border-notator-border px-3 py-1.5">
         {/* Left: MIDI status — simplified on mobile */}
         <div className="flex items-center gap-2 text-[10px]">
-          <span className="hidden rounded border border-notator-border bg-notator-bg px-2 py-0.5 text-notator-text-dim sm:inline">
+          <span
+            className={`hidden cursor-pointer rounded border px-2 py-0.5 sm:inline ${
+              midiThruEnabled
+                ? "border-notator-accent bg-notator-accent/10 text-notator-accent"
+                : "border-notator-border bg-notator-bg text-notator-text-dim"
+            }`}
+            onClick={onToggleMidiThru}
+            title="Toggle MIDI Thru"
+          >
             MIDI THRU
           </span>
+          {midiOutputName && (
+            <span
+              className="hidden cursor-pointer rounded border border-notator-border bg-notator-bg px-2 py-0.5 text-notator-text-dim hover:text-notator-text sm:inline"
+              onClick={onOpenMidiSettings}
+              title="MIDI Output device"
+            >
+              OUT: {midiOutputName}
+            </span>
+          )}
           <div className="flex items-center gap-1">
             <div
               className={`h-1.5 w-1.5 rounded-full ${

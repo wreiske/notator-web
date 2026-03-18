@@ -98,3 +98,67 @@ export function panic(output: MidiOutput): void {
     allNotesOff(output, ch);
   }
 }
+
+/** Send a Control Change message */
+export function controlChange(
+  output: MidiOutput,
+  channel: number,
+  controller: number,
+  value: number,
+  timestamp?: number,
+): void {
+  const status = 0xb0 | (channel & 0x0f);
+  output.send([status, controller & 0x7f, value & 0x7f], timestamp);
+}
+
+/** Send a Program Change message */
+export function programChange(
+  output: MidiOutput,
+  channel: number,
+  program: number,
+  timestamp?: number,
+): void {
+  const status = 0xc0 | (channel & 0x0f);
+  output.send([status, program & 0x7f], timestamp);
+}
+
+/** Send a Polyphonic Aftertouch (Key Pressure) message */
+export function aftertouch(
+  output: MidiOutput,
+  channel: number,
+  note: number,
+  pressure: number,
+  timestamp?: number,
+): void {
+  const status = 0xa0 | (channel & 0x0f);
+  output.send([status, note & 0x7f, pressure & 0x7f], timestamp);
+}
+
+/** Send a Channel Pressure (Aftertouch) message */
+export function channelPressure(
+  output: MidiOutput,
+  channel: number,
+  pressure: number,
+  timestamp?: number,
+): void {
+  const status = 0xd0 | (channel & 0x0f);
+  output.send([status, pressure & 0x7f], timestamp);
+}
+
+/** Send a System Exclusive message (requires sysex access) */
+export function sendSysEx(
+  output: MidiOutput,
+  data: Uint8Array | number[],
+  timestamp?: number,
+): void {
+  output.send(Array.from(data), timestamp);
+}
+
+/** Send raw MIDI bytes */
+export function sendRaw(
+  output: MidiOutput,
+  data: number[],
+  timestamp?: number,
+): void {
+  output.send(data, timestamp);
+}

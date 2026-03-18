@@ -36,6 +36,9 @@ import { UserMenu } from "@/components/auth/UserMenu";
 import { PublishModal } from "@/components/songs/PublishModal";
 import { ChannelMapEditor } from "@/components/tracks/ChannelMapEditor";
 import { downloadUserFile } from "@/lib/auth/api";
+import { useMidi } from "@/lib/midi/use-midi";
+import { getMidiManager } from "@/lib/midi/midi-manager";
+import { MidiSettingsPanel } from "@/components/midi/MidiSettingsPanel";
 
 /** Demo .SON files bundled from the /st directory */
 const DEMO_FILES = [
@@ -84,7 +87,11 @@ function PlayerContent() {
   const [showLogin, setShowLogin] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [showChannelMap, setShowChannelMap] = useState(false);
+  const [showMidiSettings, setShowMidiSettings] = useState(false);
   const [drumChannels, setDrumChannels] = useState<Set<number>>(new Set([9]));
+
+  // MIDI state
+  const midi = useMidi();
 
   // Playback state
   const [playbackState, setPlaybackState] = useState<PlaybackState>("stopped");
@@ -251,6 +258,16 @@ function PlayerContent() {
       }
     };
   }, []);
+
+  // Wire selected MIDI output to the PlaybackEngine
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    const manager = getMidiManager();
+    const midiOut = manager.getMidiOutputForEngine();
+    engine.setMidiOutput(midiOut);
+  }, [midi.selectedOutputId, midi.initialized]);
 
   // Global keyboard shortcuts (spacebar play/pause, etc.)
   useEffect(() => {
@@ -620,6 +637,28 @@ function PlayerContent() {
     [song, editingTrackIndex],
   );
 
+  // Wire MIDI input to piano roll note preview
+  useEffect(() => {
+    if (editingTrackIndex === null) return;
+
+    const manager = getMidiManager();
+    const handleMidiInput = (...args: unknown[]) => {
+      const msg = args[0] as import("@/lib/midi/midi-manager").MidiInputMessage;
+      if (
+        msg.type === "note_on" &&
+        msg.note !== undefined &&
+        msg.velocity !== undefined
+      ) {
+        handlePreviewNote(msg.note, msg.velocity);
+      }
+    };
+
+    manager.on("midiMessage", handleMidiInput);
+    return () => {
+      manager.off("midiMessage", handleMidiInput);
+    };
+  }, [editingTrackIndex, handlePreviewNote]);
+
   // Editor playback controls
   const handleEditorPlay = useCallback(() => {
     engineRef.current?.play();
@@ -882,6 +921,16 @@ function PlayerContent() {
           onLoadFileClick={handleLoadFileClick}
           onDemoLoad={handleDemoLoad}
           onExportMidi={undefined}
+          midiThruEnabled={midi.midiThruEnabled}
+          midiOutputName={
+            midi.selectedOutputId
+              ? (midi.outputs.find((d) => d.id === midi.selectedOutputId)
+                  ?.name ?? null)
+              : null
+          }
+          onToggleMidiThru={midi.toggleMidiThru}
+          onMidiPanic={midi.panic}
+          onOpenMidiSettings={() => setShowMidiSettings(true)}
         />
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
           <div className="space-y-8">
@@ -960,6 +1009,16 @@ function PlayerContent() {
         onLoadFileClick={handleLoadFileClick}
         onDemoLoad={handleDemoLoad}
         onExportMidi={handleExportMidi}
+        midiThruEnabled={midi.midiThruEnabled}
+        midiOutputName={
+          midi.selectedOutputId
+            ? (midi.outputs.find((d) => d.id === midi.selectedOutputId)?.name ??
+              null)
+            : null
+        }
+        onToggleMidiThru={midi.toggleMidiThru}
+        onMidiPanic={midi.panic}
+        onOpenMidiSettings={() => setShowMidiSettings(true)}
       />
 
       {/* Mobile panel tabs — visible only below sm */}
@@ -1650,6 +1709,14 @@ function PlayerContent() {
             setShowChannelMap(false);
           }}
           onClose={() => setShowChannelMap(false)}
+        />
+      )}
+
+      {/* MIDI Settings Panel */}
+      {showMidiSettings && (
+        <MidiSettingsPanel
+          midi={midi}
+          onClose={() => setShowMidiSettings(false)}
         />
       )}
     </div>
