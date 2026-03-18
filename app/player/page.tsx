@@ -11,6 +11,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { TransportBar } from "@/components/transport/TransportBar";
+import { TransportControlsPanel } from "@/components/transport/TransportControlsPanel";
 import { MemoizedTrackList as TrackList } from "@/components/tracks/TrackList";
 import { TrackContextMenu } from "@/components/tracks/TrackContextMenu";
 import { PianoRollEditor } from "@/components/tracks/PianoRollEditor";
@@ -109,10 +110,16 @@ function PlayerContent() {
   const [loopEnabled, setLoopEnabled] = useState(false);
   const [showTimeline, setShowTimeline] = useState(true);
 
+  // Locator state (tick positions) — from original Notator right panel
+  const [leftLocator, setLeftLocator] = useState(0);
+  const [rightLocator, setRightLocator] = useState(0);
+  const [cycleEnabled, setCycleEnabled] = useState(false);
+  const [autodropEnabled, setAutodropEnabled] = useState(false);
+
   // Mobile panel navigation
-  const [activePanel, setActivePanel] = useState<"arrange" | "tracks" | "info">(
-    "tracks",
-  );
+  const [activePanel, setActivePanel] = useState<
+    "arrange" | "tracks" | "info" | "transport"
+  >("tracks");
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -418,6 +425,48 @@ function PlayerContent() {
       return next;
     });
   }, []);
+
+  // Toggle cycle mode (loop between locators)
+  const handleToggleCycle = useCallback(() => {
+    setCycleEnabled((prev) => {
+      const next = !prev;
+      if (next && rightLocator > leftLocator) {
+        engineRef.current?.setLoop(true);
+        engineRef.current?.setLoopRegion(leftLocator, rightLocator);
+        setLoopEnabled(true);
+      } else if (!next) {
+        engineRef.current?.setLoopRegion(-1, -1);
+      }
+      return next;
+    });
+  }, [leftLocator, rightLocator]);
+
+  // Toggle autodrop
+  const handleToggleAutodrop = useCallback(() => {
+    setAutodropEnabled((prev) => !prev);
+  }, []);
+
+  // Set left locator and update loop region if cycle is active
+  const handleSetLeftLocator = useCallback(
+    (tick: number) => {
+      setLeftLocator(tick);
+      if (cycleEnabled && rightLocator > tick) {
+        engineRef.current?.setLoopRegion(tick, rightLocator);
+      }
+    },
+    [cycleEnabled, rightLocator],
+  );
+
+  // Set right locator and update loop region if cycle is active
+  const handleSetRightLocator = useCallback(
+    (tick: number) => {
+      setRightLocator(tick);
+      if (cycleEnabled && tick > leftLocator) {
+        engineRef.current?.setLoopRegion(leftLocator, tick);
+      }
+    },
+    [cycleEnabled, leftLocator],
+  );
 
   // Export as MIDI
   const handleExportMidi = useCallback(() => {
@@ -917,6 +966,7 @@ function PlayerContent() {
             { key: "arrange", label: "📋 Arrange" },
             { key: "tracks", label: "🎵 Tracks" },
             { key: "info", label: "ℹ️ Info" },
+            { key: "transport", label: "🎛️ Controls" },
           ] as const
         ).map(({ key, label }) => (
           <button
@@ -1404,6 +1454,42 @@ function PlayerContent() {
                 No track selected
               </div>
             )}
+          </div>
+        </aside>
+
+        {/* ─── 4TH COLUMN: TRANSPORT CONTROLS (original Notator right panel) ─── */}
+        <aside
+          className={`flex w-full flex-shrink-0 flex-col border-l border-notator-border-bright bg-notator-panel lg:flex lg:w-44 ${
+            activePanel === "transport" ? "flex" : "hidden"
+          }`}
+        >
+          <div className="border-b border-notator-border px-3 py-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-notator-text-dim">
+              Controls
+            </span>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <TransportControlsPanel
+              currentTick={currentTick}
+              ticksPerMeasure={song.ticksPerMeasure}
+              ticksPerBeat={song.ticksPerBeat}
+              totalTicks={song.totalTicks}
+              leftLocator={leftLocator}
+              rightLocator={rightLocator}
+              cycleEnabled={cycleEnabled}
+              autodropEnabled={autodropEnabled}
+              playbackState={playbackState}
+              selectedTrackIndex={selectedTrackIndex}
+              onSetLeftLocator={handleSetLeftLocator}
+              onSetRightLocator={handleSetRightLocator}
+              onToggleCycle={handleToggleCycle}
+              onToggleAutodrop={handleToggleAutodrop}
+              onSeek={handleSeek}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onStop={handleStop}
+              onEdit={handleOpenEditor}
+            />
           </div>
         </aside>
       </div>
