@@ -62,3 +62,6 @@ next-env.d.ts
 # Temporary files
 /tmp/
 crates/*/target/
+
+# Electron build output
+/dist-electron/

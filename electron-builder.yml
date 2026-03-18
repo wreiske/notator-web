@@ -1,0 +1,56 @@
+appId: online.notator.app
+productName: Notator
+copyright: Copyright © 2026 Notator Online
+
+directories:
+  output: dist-electron
+  buildResources: electron/resources
+
+files:
+  - electron/**/*
+  - out/**/*
+  - package.json
+  - "!node_modules/**/*"
+  - "!node_modules"
+
+# macOS
+mac:
+  category: public.app-category.music
+  target:
+    - target: dmg
+      arch:
+        - universal
+    - target: zip
+      arch:
+        - universal
+
+# Windows
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+# Linux
+linux:
+  category: Audio
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+
+# File associations
+fileAssociations:
+  - ext: son
+    name: Notator Song File
+    description: Notator SL Song File
+    mimeType: application/x-notator-song

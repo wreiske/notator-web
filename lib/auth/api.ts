@@ -4,7 +4,12 @@
  * Handles JWT token management and provides typed fetch wrappers.
  */
 
-const API_BASE = "/api";
+const API_BASE = (() => {
+  if (typeof window === "undefined") return "/api";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const electronAPI = (window as any).electronAPI;
+  return electronAPI?.isElectron ? "https://notator.online/api" : "/api";
+})();
 const TOKEN_KEY = "notator_token";
 
 // ─── Token Management ───

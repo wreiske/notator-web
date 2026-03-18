@@ -365,10 +365,19 @@ function PlayerContent() {
     [handleFileLoad],
   );
 
-  // File menu: trigger hidden file input
+  // File menu: trigger hidden file input (or native dialog in Electron)
   const handleLoadFileClick = useCallback(() => {
+    // Use native Electron file dialog when available
+    if (window.electronAPI?.isElectron) {
+      window.electronAPI.openFileDialog().then((result) => {
+        if (result) {
+          handleFileLoad(result.buffer, result.filename);
+        }
+      });
+      return;
+    }
     fileInputRef.current?.click();
-  }, []);
+  }, [handleFileLoad]);
 
   // File menu: handle selected file
   const handleFileInputChange = useCallback(

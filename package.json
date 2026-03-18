@@ -1,12 +1,20 @@
 {
   "name": "notator",
   "version": "0.1.0",
+  "description": "Notator Online — Play, share, and archive Atari ST Notator SL .SON files",
+  "author": "Notator Online",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron:dev": "next build && electron .",
+    "electron:build": "next build && electron-builder --mac --win --linux",
+    "electron:build:mac": "next build && electron-builder --mac",
+    "electron:build:win": "next build && electron-builder --win",
+    "electron:build:linux": "next build && electron-builder --linux"
   },
   "dependencies": {
     "next": "16.1.6",
@@ -20,6 +28,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "4.2.1",

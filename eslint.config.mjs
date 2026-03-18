@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "public/webaudiofont/**",
     // Auto-generated wasm-bindgen output:
     "lib/son-parser-wasm/**",
+    // Electron main/preload (CommonJS, not part of Next.js):
+    "electron/**",
   ]),
 ]);
 
